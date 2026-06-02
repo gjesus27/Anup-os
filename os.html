@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Acompanhar OS | Anup OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body class="public-page">
+    <main class="public-shell">
+      <section class="public-hero">
+        <div class="brand public-brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <p class="brand-title">Anup OS</p>
+            <p class="brand-subtitle">Acompanhamento</p>
+          </div>
+        </div>
+        <h1>Acompanhe sua ordem de serviço</h1>
+        <p>Consulte o andamento do reparo com segurança e fale com a loja quando precisar.</p>
+      </section>
+
+      <section id="publicLoading" class="public-card state-line">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        Carregando ordem...
+      </section>
+
+      <section id="publicEmpty" class="public-card empty-state hidden">
+        <i class="fa-regular fa-circle-question"></i>
+        <h2>OS não encontrada</h2>
+        <p>Confira se o link recebido está correto ou chame a loja no WhatsApp.</p>
+        <a class="btn btn-primary" id="fallbackWhatsapp" target="_blank" rel="noreferrer">
+          <i class="fa-brands fa-whatsapp"></i>
+          Chamar no WhatsApp
+        </a>
+      </section>
+
+      <section id="publicOrder" class="public-card hidden"></section>
+    </main>
+
+    <script type="module" src="assets/js/public.js"></script>
+  </body>
+</html>

@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Anup OS | Ordens de Serviço</title>
+    <meta name="description" content="SaaS de ordem de serviço Anup OS" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body class="bg-slate-50 text-slate-900">
+    <div id="toastHost" class="toast-host"></div>
+
+    <section id="authScreen" class="auth-screen">
+      <form id="loginForm" class="auth-card">
+        <div class="brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <p class="brand-title">Anup OS</p>
+            <p class="brand-subtitle">Gestão para assistências</p>
+          </div>
+        </div>
+        <div>
+          <p class="eyebrow">Acesso seguro</p>
+          <h1>Entrar no sistema</h1>
+        </div>
+        <label class="field">
+          <span>E-mail</span>
+          <input id="loginEmail" type="email" required autocomplete="email" />
+        </label>
+        <label class="field">
+          <span>Senha</span>
+          <input id="loginPassword" type="password" required autocomplete="current-password" />
+        </label>
+        <button class="btn btn-primary" type="submit">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          Entrar
+        </button>
+      </form>
+    </section>
+
+    <div id="appShell" class="app-shell hidden">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" id="brandMark">A</div>
+          <div>
+            <p class="brand-title" id="brandTitle">Anup OS</p>
+            <p class="brand-subtitle" id="brandSubtitle">Ordens de Serviço</p>
+          </div>
+        </div>
+
+        <nav class="nav-stack" aria-label="Navegação principal">
+          <a href="#dashboard" class="nav-link active" data-section-link="dashboard">
+            <i class="fa-solid fa-chart-pie"></i>
+            Dashboard
+          </a>
+          <a href="#ordens" class="nav-link" data-section-link="ordens">
+            <i class="fa-solid fa-screwdriver-wrench"></i>
+            Ordens
+          </a>
+          <a href="#clientes" class="nav-link" data-section-link="clientes">
+            <i class="fa-solid fa-users"></i>
+            Clientes
+          </a>
+          <a href="#admin" class="nav-link" data-section-link="admin" data-permission="manage">
+            <i class="fa-solid fa-user-gear"></i>
+            Administração
+          </a>
+          <a href="#suporte" class="nav-link" data-section-link="suporte" data-permission="support">
+            <i class="fa-solid fa-headset"></i>
+            Suporte Anup
+          </a>
+        </nav>
+
+        <div class="store-card">
+          <p class="store-label">Loja ativa</p>
+          <p class="store-name" id="sidebarStoreName">Selecione uma loja</p>
+          <p class="store-text" id="sidebarStoreText">Usuários veem apenas os dados das lojas permitidas.</p>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Painel administrativo</p>
+            <h1>Ordens de Serviço</h1>
+          </div>
+          <div class="topbar-actions">
+            <select id="storeSelector" class="topbar-select" aria-label="Selecionar loja"></select>
+            <button class="btn btn-ghost" id="refreshBtn" type="button">
+              <i class="fa-solid fa-rotate"></i>
+              Atualizar
+            </button>
+            <button class="btn btn-primary" id="newOrderBtn" type="button">
+              <i class="fa-solid fa-plus"></i>
+              Nova OS
+            </button>
+            <button class="btn btn-ghost" id="logoutBtn" type="button">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i>
+              Sair
+            </button>
+          </div>
+        </header>
+
+        <section id="dashboard" class="view-section is-visible">
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span class="metric-icon blue"><i class="fa-solid fa-folder-open"></i></span>
+              <p>Abertas</p>
+              <strong id="metricOpen">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon amber"><i class="fa-solid fa-gears"></i></span>
+              <p>Em andamento</p>
+              <strong id="metricProgress">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon emerald"><i class="fa-solid fa-circle-check"></i></span>
+              <p>Finalizadas</p>
+              <strong id="metricDone">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon violet"><i class="fa-solid fa-hourglass-half"></i></span>
+              <p>Aguardando aprovação</p>
+              <strong id="metricApproval">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon cyan"><i class="fa-solid fa-calendar-day"></i></span>
+              <p>Ordens do dia</p>
+              <strong id="metricToday">0</strong>
+            </article>
+            <article class="metric-card wide">
+              <span class="metric-icon green"><i class="fa-solid fa-brazilian-real-sign"></i></span>
+              <p>Receita estimada</p>
+              <strong id="metricRevenue">R$ 0,00</strong>
+            </article>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Movimento recente</p>
+                <h2>Últimas ordens cadastradas</h2>
+              </div>
+              <a class="text-link" href="#ordens" data-section-link="ordens">Ver todas</a>
+            </div>
+            <div id="recentOrders" class="recent-list"></div>
+          </div>
+        </section>
+
+        <section id="ordens" class="view-section">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Operação</p>
+                <h2>Gerenciar ordens</h2>
+              </div>
+              <button class="btn btn-primary" id="newOrderBtnSecondary" type="button">
+                <i class="fa-solid fa-plus"></i>
+                Nova OS
+              </button>
+            </div>
+
+            <div class="filter-grid">
+              <label class="field">
+                <span>Buscar</span>
+                <input id="searchInput" type="search" placeholder="OS, cliente, WhatsApp ou modelo" />
+              </label>
+              <label class="field">
+                <span>Status</span>
+                <select id="statusFilter">
+                  <option value="">Todos</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Data de entrada</span>
+                <input id="dateFilter" type="date" />
+              </label>
+            </div>
+
+            <div id="loadingState" class="state-line">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+              Carregando ordens...
+            </div>
+            <div id="emptyState" class="empty-state hidden">
+              <i class="fa-regular fa-clipboard"></i>
+              <h3>Nenhuma ordem encontrada</h3>
+              <p>Cadastre a primeira OS ou ajuste os filtros para visualizar os registros.</p>
+            </div>
+
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>OS</th>
+                    <th>Cliente</th>
+                    <th>Aparelho</th>
+                    <th>Status</th>
+                    <th>Entrada</th>
+                    <th>Total</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="clientes" class="view-section">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Relacionamento</p>
+                <h2>Clientes cadastrados</h2>
+              </div>
+              <button class="btn btn-primary" id="newClientBtn" type="button">
+                <i class="fa-solid fa-user-plus"></i>
+                Novo cliente
+              </button>
+            </div>
+            <div id="clientsList" class="client-grid"></div>
+          </div>
+        </section>
+
+        <section id="admin" class="view-section">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Conta</p>
+                <h2>Loja, usuários e permissões</h2>
+              </div>
+              <button class="btn btn-primary" id="newUserBtn" type="button">
+                <i class="fa-solid fa-user-plus"></i>
+                Novo usuário
+              </button>
+            </div>
+
+            <form id="storeForm" class="form-grid admin-form">
+              <label class="field span-2">
+                <span>Nome da loja</span>
+                <input id="storeNameInput" required />
+              </label>
+              <label class="field span-2">
+                <span>Logo da loja (URL)</span>
+                <input id="storeLogoInput" placeholder="https://..." />
+              </label>
+              <label class="field span-2">
+                <span>Endereço</span>
+                <input id="storeAddressInput" />
+              </label>
+              <label class="field">
+                <span>WhatsApp</span>
+                <input id="storeWhatsappInput" inputmode="tel" />
+              </label>
+              <label class="field">
+                <span>Garantia padrão</span>
+                <input id="storeWarrantyInput" type="number" min="0" />
+              </label>
+              <label class="field" data-support-billing>
+                <span>Valor mensal</span>
+                <input id="storeMonthlyPriceInput" class="money-input" inputmode="decimal" />
+              </label>
+              <label class="field" data-support-billing>
+                <span>Forma de pagamento do plano</span>
+                <input id="storePaymentMethodInput" />
+              </label>
+              <label class="field" data-support-billing>
+                <span>Vencimento do plano</span>
+                <input id="storeDueDateInput" type="date" />
+              </label>
+              <label class="field" data-support-billing>
+                <span>Status do plano</span>
+                <select id="storePlanStatusInput">
+                  <option value="em_dia">Em dia</option>
+                  <option value="perto_vencer">Perto de vencer</option>
+                  <option value="devendo">Devendo</option>
+                </select>
+              </label>
+              <button class="btn btn-primary span-2" type="submit">
+                <i class="fa-solid fa-floppy-disk"></i>
+                Salvar dados da loja
+              </button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Equipe</p>
+                <h2>Usuários da assistência/loja</h2>
+              </div>
+            </div>
+            <div id="usersList" class="admin-grid"></div>
+          </div>
+        </section>
+
+        <section id="suporte" class="view-section">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Anup OS</p>
+                <h2>Visão geral do SaaS</h2>
+              </div>
+              <button class="btn btn-primary" id="newTenantBtn" type="button">
+                <i class="fa-solid fa-building-circle-arrow-right"></i>
+                Nova assistência/loja
+              </button>
+            </div>
+            <div class="metric-grid support-metrics">
+              <article class="metric-card">
+                <span class="metric-icon blue"><i class="fa-solid fa-store"></i></span>
+                <p>Lojas</p>
+                <strong id="metricStores">0</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-icon emerald"><i class="fa-solid fa-circle-check"></i></span>
+                <p>Em dia</p>
+                <strong id="metricPaid">0</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-icon amber"><i class="fa-solid fa-clock"></i></span>
+                <p>Perto de vencer</p>
+                <strong id="metricDueSoon">0</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-icon orange"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                <p>Devendo</p>
+                <strong id="metricOverdue">0</strong>
+              </article>
+            </div>
+            <div id="supportList" class="support-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="orderModal" class="modal">
+      <form id="orderForm" class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Ordem de Serviço</p>
+            <h2 id="orderModalTitle">Nova OS</h2>
+          </div>
+          <button class="icon-btn" type="button" data-close-modal="orderModal" aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <input type="hidden" id="orderId" />
+        <div class="form-grid">
+          <label class="field span-2"><span>Cliente</span><input id="clienteNome" required autocomplete="name" /></label>
+          <label class="field"><span>WhatsApp</span><input id="clienteWhatsapp" required inputmode="tel" placeholder="(00) 00000-0000" /></label>
+          <label class="field"><span>CPF opcional</span><input id="clienteCpf" inputmode="numeric" /></label>
+          <label class="field span-2"><span>Endereço opcional</span><input id="clienteEndereco" /></label>
+          <label class="field span-2"><span>Observações do cliente</span><textarea id="clienteObservacoes" rows="2"></textarea></label>
+          <label class="field"><span>Marca</span><input id="marca" required placeholder="Samsung, Apple..." /></label>
+          <label class="field"><span>Modelo</span><input id="modelo" required placeholder="iPhone 11, A32..." /></label>
+          <label class="field"><span>IMEI opcional</span><input id="imei" /></label>
+          <label class="field"><span>Status</span><select id="status" required></select></label>
+          <label class="field span-2"><span>Defeito relatado</span><textarea id="defeitoRelatado" required rows="3"></textarea></label>
+          <label class="field span-2"><span>Diagnóstico técnico</span><textarea id="diagnosticoTecnico" rows="3"></textarea></label>
+          <label class="field span-2"><span>Serviço a realizar</span><textarea id="servico" rows="2"></textarea></label>
+          <label class="field span-2"><span>Peças utilizadas</span><textarea id="pecas" rows="2"></textarea></label>
+          <label class="field"><span>Valor mão de obra</span><input id="valorMaoObra" class="money-input" inputmode="decimal" placeholder="R$ 0,00" /></label>
+          <label class="field"><span>Valor peças</span><input id="valorPecas" class="money-input" inputmode="decimal" placeholder="R$ 0,00" /></label>
+          <label class="field"><span>Valor total</span><input id="valorTotal" class="money-input" inputmode="decimal" placeholder="R$ 0,00" /></label>
+          <label class="field"><span>Forma de pagamento</span><input id="formaPagamento" placeholder="Pix, cartão, dinheiro..." /></label>
+          <label class="field"><span>Data de entrada</span><input id="dataEntrada" type="date" required /></label>
+          <label class="field"><span>Previsão de entrega</span><input id="previsaoEntrega" type="date" /></label>
+          <label class="field"><span>Garantia</span><input id="garantiaDias" type="number" min="0" value="90" /></label>
+          <label class="field"><span>Custo de peças</span><input id="custoPecas" class="money-input" inputmode="decimal" placeholder="R$ 0,00" /></label>
+          <label class="field span-2"><span>Diagnóstico interno</span><textarea id="diagnosticoInterno" rows="2"></textarea></label>
+          <label class="field span-2"><span>Observações internas</span><textarea id="observacoesInternas" rows="3"></textarea></label>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" data-close-modal="orderModal">Cancelar</button>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i>Salvar OS</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="clientModal" class="modal">
+      <form id="clientForm" class="modal-card compact">
+        <div class="modal-header">
+          <div><p class="eyebrow">Cliente</p><h2>Novo cliente</h2></div>
+          <button class="icon-btn" type="button" data-close-modal="clientModal" aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="form-grid single">
+          <label class="field"><span>Nome completo</span><input id="clientNome" required /></label>
+          <label class="field"><span>WhatsApp</span><input id="clientWhatsapp" required inputmode="tel" /></label>
+          <label class="field"><span>CPF opcional</span><input id="clientCpf" /></label>
+          <label class="field"><span>Endereço opcional</span><input id="clientEndereco" /></label>
+          <label class="field"><span>Observações</span><textarea id="clientObservacoes" rows="3"></textarea></label>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" data-close-modal="clientModal">Cancelar</button>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-user-check"></i>Salvar cliente</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="detailsModal" class="modal">
+      <div class="modal-card details-card">
+        <div class="modal-header">
+          <div><p class="eyebrow">Detalhes técnicos</p><h2 id="detailsTitle">OS</h2></div>
+          <button class="icon-btn" type="button" data-close-modal="detailsModal" aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="detailsContent"></div>
+      </div>
+    </dialog>
+
+    <dialog id="userModal" class="modal">
+      <form id="userForm" class="modal-card compact">
+        <div class="modal-header">
+          <div><p class="eyebrow">Usuário</p><h2 id="userModalTitle">Novo usuário</h2></div>
+          <button class="icon-btn" type="button" data-close-modal="userModal" aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <input type="hidden" id="userId" />
+        <div class="form-grid single">
+          <label class="field"><span>Nome</span><input id="userName" required /></label>
+          <label class="field"><span>E-mail</span><input id="userEmail" type="email" required /></label>
+          <label class="field" id="userPasswordField"><span>Senha inicial</span><input id="userPassword" type="password" minlength="6" /></label>
+          <label class="field"><span>Nível</span><select id="userRole"></select></label>
+          <label class="field"><span>Lojas liberadas</span><select id="userStores" multiple></select></label>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" id="resetPasswordBtn"><i class="fa-solid fa-key"></i>Redefinir senha</button>
+          <button class="btn btn-ghost" type="button" data-close-modal="userModal">Cancelar</button>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i>Salvar usuário</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="tenantModal" class="modal">
+      <form id="tenantForm" class="modal-card compact">
+        <div class="modal-header">
+          <div><p class="eyebrow">SaaS</p><h2>Cadastrar assistência/loja</h2></div>
+          <button class="icon-btn" type="button" data-close-modal="tenantModal" aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="form-grid single">
+          <label class="field"><span>Assistência existente</span><select id="tenantExisting"><option value="">Criar nova assistência</option></select></label>
+          <label class="field"><span>Nome da assistência</span><input id="tenantName" /></label>
+          <label class="field"><span>Nome da loja</span><input id="tenantStoreName" required /></label>
+          <label class="field"><span>Valor mensal</span><input id="tenantMonthlyPrice" class="money-input" inputmode="decimal" /></label>
+          <label class="field"><span>Forma de pagamento</span><input id="tenantPaymentMethod" placeholder="Pix, boleto, cartão..." /></label>
+          <label class="field"><span>Vencimento</span><input id="tenantDueDate" type="date" required /></label>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" data-close-modal="tenantModal">Cancelar</button>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus"></i>Cadastrar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="assets/js/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,110 @@
+{
+  "projectId": "anup-os",
+  "supportEmail": "g.jesus140606@gmail.com",
+  "collections": {
+    "sistema/config": {
+      "nome": "Anup OS",
+      "versaoSchema": 1,
+      "moeda": "BRL",
+      "diasAvisoVencimento": 5
+    },
+    "catalogos/status_os": {
+      "items": [
+        "Aguardando análise",
+        "Orçamento enviado",
+        "Aguardando aprovação",
+        "Aprovado",
+        "Em conserto",
+        "Aguardando peça",
+        "Finalizado",
+        "Entregue",
+        "Cancelado"
+      ]
+    },
+    "catalogos/niveis_usuario": {
+      "items": [
+        "suporte",
+        "assistencia_admin",
+        "loja_admin",
+        "gerente",
+        "tecnico",
+        "financeiro",
+        "leitura"
+      ]
+    },
+    "assistencias/{assistenciaId}": {
+      "nome": "string",
+      "ativo": "boolean",
+      "criadoEm": "timestamp",
+      "atualizadoEm": "timestamp"
+    },
+    "lojas/{lojaId}": {
+      "nome": "string",
+      "assistenciaId": "string",
+      "assistenciaNome": "string",
+      "logoUrl": "string",
+      "endereco": "string",
+      "whatsapp": "string",
+      "garantiaDias": "number",
+      "valorMensal": "number",
+      "formaPagamento": "string",
+      "planoVencimento": "YYYY-MM-DD",
+      "planoStatus": "em_dia | perto_vencer | devendo",
+      "ativo": "boolean",
+      "criadoEm": "timestamp",
+      "atualizadoEm": "timestamp"
+    },
+    "usuarios/{uid}": {
+      "nome": "string",
+      "email": "string",
+      "role": "suporte | assistencia_admin | loja_admin | gerente | tecnico | financeiro | leitura",
+      "assistenciaId": "string | null",
+      "lojaIds": "array<string>",
+      "ativo": "boolean",
+      "criadoEm": "timestamp",
+      "atualizadoEm": "timestamp"
+    },
+    "lojas/{lojaId}/clientes/{clienteId}": {
+      "nome": "string",
+      "whatsapp": "string",
+      "cpf": "string",
+      "endereco": "string",
+      "observacoes": "string",
+      "lojaId": "string",
+      "assistenciaId": "string",
+      "criadoEm": "timestamp",
+      "atualizadoEm": "timestamp"
+    },
+    "lojas/{lojaId}/ordens/{ordemId}": {
+      "numeroOS": "string",
+      "clienteId": "string",
+      "clienteNome": "string",
+      "clienteWhatsapp": "string",
+      "marca": "string",
+      "modelo": "string",
+      "status": "status_os",
+      "valorTotal": "number",
+      "lojaId": "string",
+      "assistenciaId": "string",
+      "criadoEm": "timestamp",
+      "atualizadoEm": "timestamp"
+    },
+    "public_ordens/{ordemId}": {
+      "numeroOS": "string",
+      "clienteNome": "string",
+      "clienteWhatsapp": "string",
+      "marca": "string",
+      "modelo": "string",
+      "defeitoRelatado": "string",
+      "valorTotal": "number",
+      "status": "status_os",
+      "garantiaDias": "number",
+      "previsaoEntrega": "YYYY-MM-DD",
+      "lojaId": "string",
+      "lojaNome": "string",
+      "lojaEndereco": "string",
+      "lojaWhatsapp": "string",
+      "atualizadoEm": "timestamp"
+    }
+  }
+}

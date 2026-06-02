@@ -1,0 +1,97 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function supportEmail() {
+      return request.auth.token.email == "g.jesus140606@gmail.com";
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function isSupport() {
+      return signedIn() && (supportEmail() || userDoc().role == "suporte");
+    }
+
+    function hasStore(lojaId) {
+      return signedIn() && (isSupport() || lojaId in userDoc().lojaIds);
+    }
+
+    function managesTenant(assistenciaId) {
+      return signedIn() && (
+        isSupport() ||
+        (
+          userDoc().assistenciaId == assistenciaId &&
+          userDoc().role in ["assistencia_admin", "loja_admin"]
+        )
+      );
+    }
+
+    match /public_ordens/{orderId} {
+      allow read: if true;
+      allow create, update: if signedIn() && (isSupport() || hasStore(request.resource.data.lojaId));
+      allow delete: if signedIn() && (isSupport() || hasStore(resource.data.lojaId));
+    }
+
+    match /usuarios/{userId} {
+      allow read: if signedIn() && (
+        isSupport() ||
+        userId == request.auth.uid ||
+        userDoc().assistenciaId == resource.data.assistenciaId
+      );
+
+      allow create: if signedIn() && (
+        isSupport() ||
+        (
+          userId == request.auth.uid &&
+          request.resource.data.email == "g.jesus140606@gmail.com" &&
+          request.resource.data.role == "suporte"
+        ) ||
+        managesTenant(request.resource.data.assistenciaId)
+      );
+
+      allow update: if signedIn() && (
+        isSupport() ||
+        managesTenant(resource.data.assistenciaId)
+      );
+
+      allow delete: if isSupport();
+    }
+
+    match /assistencias/{assistenciaId} {
+      allow read: if signedIn() && (
+        isSupport() ||
+        userDoc().assistenciaId == assistenciaId
+      );
+      allow create, update, delete: if isSupport();
+    }
+
+    match /lojas/{lojaId} {
+      allow read: if hasStore(lojaId);
+      allow create, delete: if isSupport();
+      allow update: if signedIn() && (
+        isSupport() ||
+        (
+          hasStore(lojaId) &&
+          userDoc().role in ["assistencia_admin", "loja_admin"]
+        )
+      );
+
+      match /clientes/{clientId} {
+        allow read, write: if hasStore(lojaId);
+      }
+
+      match /ordens/{orderId} {
+        allow read: if hasStore(lojaId);
+        allow create, update, delete: if hasStore(lojaId) && !(
+          userDoc().role in ["financeiro", "leitura"]
+        );
+      }
+    }
+  }
+}
