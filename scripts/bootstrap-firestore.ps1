@@ -182,6 +182,13 @@ Set-FirestoreDocument -Token $token -Path "lojas/$lojaId" -Data @{
   assistenciaNome = "Anup OS Administração"
   logoUrl = ""
   endereco = ""
+  cnpj = ""
+  instagram = ""
+  email = ""
+  site = ""
+  cep = ""
+  cidade = ""
+  estado = ""
   whatsapp = ""
   garantiaDias = 90
   valorMensal = 0

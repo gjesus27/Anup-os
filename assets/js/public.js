@@ -23,10 +23,21 @@ function render(order) {
   const device = `${order.marca || ""} ${order.modelo || ""}`.trim();
   const store = {
     nome: order.lojaNome,
+    logoUrl: order.lojaLogo,
+    cnpj: order.lojaCnpj,
     endereco: order.lojaEndereco,
     whatsapp: order.lojaWhatsapp,
+    instagram: order.lojaInstagram,
+    email: order.lojaEmail,
+    site: order.lojaSite,
+    cep: order.lojaCep,
+    cidade: order.lojaCidade,
+    estado: order.lojaEstado,
   };
   document.querySelector(".brand-title").textContent = storeName(store);
+  document.querySelector(".brand-mark").innerHTML = store.logoUrl
+    ? `<img src="${escapeHtml(store.logoUrl)}" alt="${escapeHtml(storeName(store))}" class="public-logo">`
+    : escapeHtml(storeName(store).slice(0, 1).toUpperCase());
   document.querySelector(".public-hero h1").textContent = "Acompanhe sua ordem de serviço";
   document.querySelector(".public-hero p").textContent = "Consulte o andamento do reparo com segurança e fale com a loja quando precisar.";
   fallback.href = whatsappLink(storeWhatsapp(store), `Olá! Gostaria de consultar uma ordem de serviço na ${storeName(store)}.`);
@@ -54,6 +65,12 @@ function render(order) {
       ${item("Previsão de entrega", formatDate(order.previsaoEntrega))}
       ${item("Garantia", `${order.garantiaDias || 90} dias`)}
       ${item("Endereço da loja", storeAddress(store))}
+      ${optionalItem("Cidade/Estado", [store.cidade, store.estado].filter(Boolean).join(" - "))}
+      ${optionalItem("CEP", store.cep)}
+      ${optionalItem("CNPJ", store.cnpj)}
+      ${optionalItem("Instagram", store.instagram)}
+      ${optionalItem("E-mail", store.email)}
+      ${optionalItem("Site", store.site)}
     </div>
 
     <a class="btn btn-whatsapp public-whatsapp" href="${whatsappLink(storeWhatsapp(store), publicMessage(order))}" target="_blank" rel="noreferrer">
@@ -67,6 +84,10 @@ function render(order) {
 
 function item(label, value) {
   return `<div class="public-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "Não informado")}</strong></div>`;
+}
+
+function optionalItem(label, value) {
+  return value ? item(label, value) : "";
 }
 
 async function init() {

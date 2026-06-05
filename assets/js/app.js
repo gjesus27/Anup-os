@@ -1,4 +1,4 @@
-import {
+﻿import {
   ACTIVE_STATUSES,
   DONE_STATUSES,
   STATUSES,
@@ -79,6 +79,10 @@ const refs = {
   searchInput: $("#searchInput"),
   statusFilter: $("#statusFilter"),
   dateFilter: $("#dateFilter"),
+  dashboardSearchInput: $("#dashboardSearchInput"),
+  dashboardStatusFilter: $("#dashboardStatusFilter"),
+  dashboardDateFilter: $("#dashboardDateFilter"),
+  dashboardPeriodFilter: $("#dashboardPeriodFilter"),
   storeSelector: $("#storeSelector"),
 };
 
@@ -129,6 +133,7 @@ function fillStatusOptions() {
   const options = STATUSES.map((status) => `<option value="${status}">${status}</option>`).join("");
   $("#status").innerHTML = options;
   refs.statusFilter.innerHTML = `<option value="">Todos</option>${options}`;
+  refs.dashboardStatusFilter.innerHTML = `<option value="">Todos</option>${options}`;
 }
 
 function fillRoleOptions() {
@@ -169,13 +174,14 @@ function bindMasks() {
     });
   });
   ["#valorMaoObra", "#valorPecas"].forEach((selector) => {
+    $(selector).addEventListener("input", updateTotal);
     $(selector).addEventListener("blur", updateTotal);
   });
 }
 
 function updateTotal() {
   const total = parseCurrency($("#valorMaoObra").value) + parseCurrency($("#valorPecas").value);
-  if (total) $("#valorTotal").value = currency(total);
+  $("#valorTotal").value = currency(total);
 }
 
 async function login(event) {
@@ -273,6 +279,13 @@ function fillStoreFields() {
   $("#storeNameInput").value = store?.nome || "";
   $("#storeLogoInput").value = store?.logoUrl || "";
   $("#storeAddressInput").value = store?.endereco || "";
+  $("#storeCnpjInput").value = store?.cnpj || "";
+  $("#storeInstagramInput").value = store?.instagram || "";
+  $("#storeEmailInput").value = store?.email || "";
+  $("#storeSiteInput").value = store?.site || "";
+  $("#storeCepInput").value = store?.cep || "";
+  $("#storeCityInput").value = store?.cidade || "";
+  $("#storeStateInput").value = store?.estado || "";
   $("#storeWhatsappInput").value = maskPhone(store?.whatsapp || "");
   $("#storeWarrantyInput").value = store?.garantiaDias || 90;
   $("#storeMonthlyPriceInput").value = store?.valorMensal ? currency(store.valorMensal) : "";
@@ -419,7 +432,11 @@ function setFormValue(order) {
 function formOrderPayload() {
   const valorMaoObra = parseCurrency($("#valorMaoObra").value);
   const valorPecas = parseCurrency($("#valorPecas").value);
-  const valorTotal = parseCurrency($("#valorTotal").value) || valorMaoObra + valorPecas;
+  const custoPecas = parseCurrency($("#custoPecas").value);
+  const valorTotal = valorMaoObra + valorPecas;
+  const despesaPecas = valorPecas;
+  const lucroBruto = valorMaoObra;
+  const lucroReal = valorMaoObra;
   return {
     clienteNome: $("#clienteNome").value.trim(),
     clienteWhatsapp: $("#clienteWhatsapp").value.trim(),
@@ -435,13 +452,16 @@ function formOrderPayload() {
     pecas: $("#pecas").value.trim(),
     valorMaoObra,
     valorPecas,
+    custoPecas,
+    despesaPecas,
     valorTotal,
+    lucroBruto,
+    lucroReal,
     formaPagamento: $("#formaPagamento").value.trim(),
     status: $("#status").value,
     garantiaDias: Number($("#garantiaDias").value) || activeStore()?.garantiaDias || 90,
     dataEntrada: $("#dataEntrada").value || todayISO(),
     previsaoEntrega: $("#previsaoEntrega").value,
-    custoPecas: parseCurrency($("#custoPecas").value),
     diagnosticoInterno: $("#diagnosticoInterno").value.trim(),
     observacoesInternas: $("#observacoesInternas").value.trim(),
   };
@@ -536,8 +556,16 @@ function publicPayload(order) {
     previsaoEntrega: order.previsaoEntrega,
     lojaId: activeStoreId,
     lojaNome: store?.nome || "",
+    lojaLogo: store?.logoUrl || "",
+    lojaCnpj: store?.cnpj || "",
     lojaEndereco: store?.endereco || "",
     lojaWhatsapp: store?.whatsapp || "",
+    lojaInstagram: store?.instagram || "",
+    lojaEmail: store?.email || "",
+    lojaSite: store?.site || "",
+    lojaCep: store?.cep || "",
+    lojaCidade: store?.cidade || "",
+    lojaEstado: store?.estado || "",
     atualizadoEm: serverTimestamp(),
   };
 }
@@ -571,13 +599,46 @@ function filteredOrders() {
   });
 }
 
+function dashboardFilteredOrders() {
+  const term = refs.dashboardSearchInput.value.toLowerCase().trim();
+  const status = refs.dashboardStatusFilter.value;
+  const date = refs.dashboardDateFilter.value;
+  const period = refs.dashboardPeriodFilter.value;
+  const now = new Date();
+  const currentMonth = now.toISOString().slice(0, 7);
+  const currentYear = String(now.getFullYear());
+
+  return orders.filter((order) => {
+    const haystack = [order.numeroOS, order.clienteNome, order.clienteWhatsapp, order.status, order.modelo, order.marca]
+      .join(" ")
+      .toLowerCase();
+    const orderDate = order.dataEntrada || "";
+    const matchesPeriod =
+      !period ||
+      (period === "today" && orderDate === todayISO()) ||
+      (period === "month" && orderDate.startsWith(currentMonth)) ||
+      (period === "year" && orderDate.startsWith(currentYear));
+
+    return (
+      (!term || haystack.includes(term)) &&
+      (!status || order.status === status) &&
+      (!date || orderDate === date) &&
+      matchesPeriod
+    );
+  });
+}
+
 function renderDashboard() {
-  const open = orders.filter((order) => ACTIVE_STATUSES.includes(order.status)).length;
-  const progress = orders.filter((order) => ["Aprovado", "Em conserto", "Aguardando peça"].includes(order.status)).length;
-  const done = orders.filter((order) => DONE_STATUSES.includes(order.status)).length;
-  const approval = orders.filter((order) => order.status === "Aguardando aprovação").length;
-  const today = orders.filter((order) => order.dataEntrada === todayISO()).length;
-  const revenue = orders.filter((order) => order.status !== "Cancelado").reduce((sum, order) => sum + Number(order.valorTotal || 0), 0);
+  const items = dashboardFilteredOrders();
+  const billableItems = items.filter((order) => order.status !== "Cancelado");
+  const open = items.filter((order) => ACTIVE_STATUSES.includes(order.status)).length;
+  const progress = items.filter((order) => ["Aprovado", "Em conserto", "Aguardando peça"].includes(order.status)).length;
+  const done = items.filter((order) => DONE_STATUSES.includes(order.status)).length;
+  const approval = items.filter((order) => order.status === "Aguardando aprovação").length;
+  const today = items.filter((order) => order.dataEntrada === todayISO()).length;
+  const revenue = billableItems.reduce((sum, order) => sum + Number(order.valorTotal || 0), 0);
+  const expenses = billableItems.reduce((sum, order) => sum + Number(order.valorPecas || 0), 0);
+  const profit = billableItems.reduce((sum, order) => sum + Number(order.valorMaoObra || 0), 0);
 
   $("#metricOpen").textContent = open;
   $("#metricProgress").textContent = progress;
@@ -585,7 +646,9 @@ function renderDashboard() {
   $("#metricApproval").textContent = approval;
   $("#metricToday").textContent = today;
   $("#metricRevenue").textContent = currency(revenue);
-  refs.recentOrders.innerHTML = orders.slice(0, 6).map(renderRecentOrder).join("") || emptyMini("Nenhuma OS cadastrada.");
+  $("#metricExpenses").textContent = currency(expenses);
+  $("#metricProfit").textContent = currency(profit);
+  refs.recentOrders.innerHTML = items.slice(0, 6).map(renderRecentOrder).join("") || emptyMini("Nenhuma OS cadastrada.");
 }
 
 function renderRecentOrder(order) {
@@ -691,7 +754,7 @@ function emptyMini(text) {
 
 function openDetails(order) {
   $("#detailsTitle").textContent = `${order.numeroOS} · ${order.clienteNome}`;
-  const profit = Number(order.valorTotal || 0) - Number(order.custoPecas || 0);
+  const profit = Number(order.valorMaoObra || 0);
   $("#detailsContent").innerHTML = `<div class="details-grid">
     ${detail("Cliente", order.clienteNome)}
     ${detail("WhatsApp", order.clienteWhatsapp)}
@@ -703,8 +766,8 @@ function openDetails(order) {
     ${detail("Diagnóstico técnico", order.diagnosticoTecnico || "Não informado", false, "span-2")}
     ${detail("Serviço", order.servico || "Não informado", false, "span-2")}
     ${detail("Peças", order.pecas || "Não informado", false, "span-2")}
-    ${detail("Custo de peças", currency(order.custoPecas))}
-    ${detail("Lucro estimado", currency(profit))}
+    ${detail("Despesa em peças", currency(order.valorPecas))}
+    ${detail("Lucro mão de obra", currency(profit))}
     ${detail("Diagnóstico interno", order.diagnosticoInterno || "Não informado", false, "span-2 internal")}
     ${detail("Observações internas", order.observacoesInternas || "Não informado", false, "span-2 internal")}
   </div>
@@ -752,7 +815,7 @@ async function handleOrderAction(action, id) {
     await navigator.clipboard.writeText(url);
     toast("Link público copiado.");
   }
-  if (action === "print") printOrder(order);
+  if (action === "print") printCustomerOrder(order);
   if (action === "delete" && canWriteOrders()) {
     if (confirm(`Excluir a ${order.numeroOS}? Essa ação não pode ser desfeita.`)) {
       await deleteDoc(doc(db, ...storePath("ordens", id)));
@@ -762,21 +825,59 @@ async function handleOrderAction(action, id) {
   }
 }
 
-function printOrder(order) {
+function printCustomerOrder(order) {
   const store = activeStore();
   const win = window.open("", "_blank");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${order.numeroOS}</title>
-  <style>body{font-family:Arial,sans-serif;color:#111827;margin:32px}.print{max-width:820px;margin:auto}.head{display:flex;justify-content:space-between;border-bottom:2px solid #111827;padding-bottom:18px}.brand{font-size:28px;font-weight:800}.muted{color:#64748b}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0}.box{border:1px solid #cbd5e1;border-radius:8px;padding:14px}.box span{display:block;color:#64748b;font-size:12px;text-transform:uppercase}.box strong{display:block;margin-top:5px}.terms{font-size:13px;line-height:1.6;border-top:1px solid #cbd5e1;padding-top:16px}.sign{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:60px}.line{border-top:1px solid #111827;text-align:center;padding-top:8px}.total{font-size:22px}@media print{button{display:none}body{margin:18px}}</style>
-  </head><body><div class="print">
-    <div class="head"><div><div class="brand">${escapeHtml(store?.nome || "Anup OS")}</div><p class="muted">${escapeHtml(store?.endereco || "")}</p></div><div><strong>${order.numeroOS}</strong><p class="muted">Entrada: ${formatDate(order.dataEntrada)}</p></div></div>
-    <div class="grid">
-      ${printBox("Cliente", order.clienteNome)}${printBox("WhatsApp", order.clienteWhatsapp)}${printBox("Aparelho", `${order.marca || ""} ${order.modelo || ""}`)}${printBox("IMEI", order.imei || "Não informado")}
-      ${printBox("Defeito", order.defeitoRelatado)}${printBox("Serviço", order.servico || "A definir")}${printBox("Peças", order.pecas || "Não informado")}${printBox("Previsão", formatDate(order.previsaoEntrega))}
-      ${printBox("Mão de obra", currency(order.valorMaoObra))}${printBox("Peças", currency(order.valorPecas))}${printBox("Forma de pagamento", order.formaPagamento || "A combinar")}${printBox("Total", `<span class="total">${currency(order.valorTotal)}</span>`, true)}
+  const url = publicOrderUrl(order.id);
+  const locationLine = [store?.cidade, store?.estado].filter(Boolean).join(" - ");
+  const cepLine = store?.cep ? `CEP ${store.cep}` : "";
+  const logo = store?.logoUrl
+    ? `<img class="logo" src="${escapeHtml(store.logoUrl)}" alt="Logo ${escapeHtml(store?.nome || "loja")}">`
+    : `<div class="logo-fallback">${escapeHtml((store?.nome || "A").slice(0, 1).toUpperCase())}</div>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(order.numeroOS)}</title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#111827;margin:20px;background:#f8fafc}.print{max-width:820px;margin:auto;background:white;padding:22px;border:1px solid #dbe3ef}.head{display:grid;grid-template-columns:1fr auto;gap:18px;border-bottom:2px solid #111827;padding-bottom:14px}.store-head{display:flex;gap:14px;align-items:flex-start}.logo{width:64px;height:64px;object-fit:contain;border:1px solid #dbe3ef;border-radius:8px}.logo-fallback{display:grid;width:64px;height:64px;place-items:center;border-radius:8px;background:#0f766e;color:white;font-size:30px;font-weight:900}.brand{font-size:24px;font-weight:900}.muted,.contact{color:#64748b}.contact{margin:3px 0 0;font-size:12px;line-height:1.35}.os-box{text-align:right}.os-number{font-size:22px;font-weight:900}.section-title{margin:16px 0 8px;font-size:12px;font-weight:900;text-transform:uppercase;color:#0f766e;letter-spacing:.08em}.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.box{border:1px solid #dbe3ef;border-radius:8px;padding:10px;background:#f8fafc}.box.wide{grid-column:1 / -1}.box span{display:block;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase}.box strong{display:block;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.total-box{margin:14px 0;padding:14px;border:2px solid #0f766e;border-radius:8px;text-align:right}.total-box span{display:block;color:#0f766e;font-size:11px;font-weight:900;text-transform:uppercase}.total-box strong{display:block;margin-top:4px;font-size:30px}.terms{font-size:12px;line-height:1.45;border-top:1px solid #dbe3ef;padding-top:10px}.public-link{margin-top:6px;color:#334155;font-size:11px;overflow-wrap:anywhere}.actions{margin-top:14px;text-align:right}.actions button{padding:10px 16px;border:0;border-radius:8px;background:#0f766e;color:white;font-weight:800;cursor:pointer}@media print{button{display:none}body{margin:0;background:white}.print{border:0;padding:12px}.total-box{break-inside:avoid}}
+  </style></head><body><div class="print">
+    <div class="head">
+      <div class="store-head">
+        ${logo}
+        <div>
+          <div class="brand">${escapeHtml(store?.nome || "Anup OS")}</div>
+          ${customerPrintContact("CNPJ", store?.cnpj)}
+          ${customerPrintContact("", store?.endereco)}
+          ${customerPrintContact("", [locationLine, cepLine].filter(Boolean).join(" - "))}
+          ${customerPrintContact("WhatsApp", store?.whatsapp)}
+          ${customerPrintContact("Instagram", store?.instagram)}
+          ${customerPrintContact("E-mail", store?.email)}
+          ${customerPrintContact("Site", store?.site)}
+        </div>
+      </div>
+      <div class="os-box">
+        <div class="muted">Ordem de Serviço</div>
+        <div class="os-number">${escapeHtml(order.numeroOS)}</div>
+        <div class="muted">Entrada: ${formatDate(order.dataEntrada)}</div>
+      </div>
     </div>
-    <div class="terms"><strong>Garantia:</strong> ${order.garantiaDias || 90} dias para o serviço executado, conforme condições da loja.</div>
-    <div class="sign"><div class="line">Assinatura do cliente</div><div class="line">${escapeHtml(store?.nome || "Anup OS")}</div></div>
-    <button onclick="window.print()">Imprimir</button>
+    <div class="section-title">Dados do atendimento</div>
+    <div class="grid">
+      ${customerPrintBox("Cliente", order.clienteNome)}
+      ${customerPrintBox("WhatsApp do cliente", order.clienteWhatsapp)}
+      ${customerPrintBox("Aparelho", `${order.marca || ""} ${order.modelo || ""}`.trim())}
+      ${customerPrintBox("IMEI", order.imei || "Não informado")}
+      ${customerPrintBox("Previsão de entrega", formatDate(order.previsaoEntrega))}
+      ${customerPrintBox("Status", order.status)}
+      ${customerPrintBox("Defeito relatado", order.defeitoRelatado, "wide")}
+      ${customerPrintBox("Serviço a realizar/executado", order.servico || "A definir", "wide")}
+      ${customerPrintBox("Peças utilizadas", order.pecas || "Não informado", "wide")}
+      ${customerPrintBox("Garantia", `${order.garantiaDias || 90} dias`)}
+      ${customerPrintBox("Forma de pagamento", order.formaPagamento || "A combinar")}
+    </div>
+    <div class="total-box"><span>Valor total</span><strong>${currency(order.valorTotal)}</strong></div>
+    <div class="terms">
+      <strong>Garantia:</strong> ${order.garantiaDias || 90} dias sobre o serviço executado, sem cobertura para mau uso, dano físico, líquido ou violação por terceiros.
+      <div class="public-link"><strong>Acompanhamento online:</strong> ${escapeHtml(url)}</div>
+    </div>
+    <div class="actions"><button onclick="window.print()">Imprimir</button></div>
   </div></body></html>`;
   win.document.write(html);
   win.document.close();
@@ -784,8 +885,18 @@ function printOrder(order) {
   setTimeout(() => win.print(), 300);
 }
 
-function printBox(label, value, html = false) {
-  return `<div class="box"><span>${escapeHtml(label)}</span><strong>${html ? value : escapeHtml(value)}</strong></div>`;
+function customerPrintContact(label, value) {
+  if (!value) return "";
+  const prefix = label ? `${label}: ` : "";
+  return `<p class="contact">${escapeHtml(prefix)}${escapeHtml(value)}</p>`;
+}
+
+function customerPrintBox(label, value, extra = "") {
+  return `<div class="box ${extra}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "Não informado")}</strong></div>`;
+}
+
+function printOrder(order) {
+  return printCustomerOrder(order);
 }
 
 async function saveStore(event) {
@@ -795,6 +906,13 @@ async function saveStore(event) {
     nome: $("#storeNameInput").value.trim(),
     logoUrl: $("#storeLogoInput").value.trim(),
     endereco: $("#storeAddressInput").value.trim(),
+    cnpj: $("#storeCnpjInput").value.trim(),
+    instagram: $("#storeInstagramInput").value.trim(),
+    email: $("#storeEmailInput").value.trim(),
+    site: $("#storeSiteInput").value.trim(),
+    cep: $("#storeCepInput").value.trim(),
+    cidade: $("#storeCityInput").value.trim(),
+    estado: $("#storeStateInput").value.trim().toUpperCase(),
     whatsapp: normalizePhone($("#storeWhatsappInput").value),
     garantiaDias: Number($("#storeWarrantyInput").value) || 90,
     atualizadoEm: serverTimestamp(),
@@ -879,6 +997,16 @@ async function saveTenant(event) {
     nome: $("#tenantStoreName").value.trim(),
     assistenciaId,
     assistenciaNome,
+    logoUrl: "",
+    endereco: "",
+    cnpj: "",
+    instagram: "",
+    email: "",
+    site: "",
+    cep: "",
+    cidade: "",
+    estado: "",
+    whatsapp: "",
     valorMensal: parseCurrency($("#tenantMonthlyPrice").value),
     formaPagamento: $("#tenantPaymentMethod").value.trim(),
     planoVencimento: $("#tenantDueDate").value,
@@ -927,6 +1055,12 @@ function bindEvents() {
   refs.tenantForm.addEventListener("submit", saveTenant);
   refs.storeForm.addEventListener("submit", saveStore);
   [refs.searchInput, refs.statusFilter, refs.dateFilter].forEach((input) => input.addEventListener("input", renderOrders));
+  [
+    refs.dashboardSearchInput,
+    refs.dashboardStatusFilter,
+    refs.dashboardDateFilter,
+    refs.dashboardPeriodFilter,
+  ].forEach((input) => input.addEventListener("input", renderDashboard));
   $$("[data-close-modal]").forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
   refs.ordersTable.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
@@ -974,3 +1108,5 @@ fillStatusOptions();
 bindNavigation();
 bindMasks();
 bindEvents();
+
+

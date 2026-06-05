@@ -96,6 +96,12 @@ textarea {
   letter-spacing: 0;
 }
 
+.brand-mark .public-logo {
+  max-width: 38px;
+  max-height: 38px;
+  object-fit: contain;
+}
+
 .brand-title {
   margin: 0;
   font-size: 18px;
@@ -331,6 +337,14 @@ textarea {
 
 .panel {
   padding: 20px;
+}
+
+.compact-panel {
+  padding-bottom: 16px;
+}
+
+.dashboard-filter-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .panel-header {

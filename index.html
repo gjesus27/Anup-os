@@ -107,6 +107,40 @@
         </header>
 
         <section id="dashboard" class="view-section is-visible">
+          <div class="panel compact-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Resumo financeiro</p>
+                <h2>Filtros do dashboard</h2>
+              </div>
+            </div>
+            <div class="filter-grid dashboard-filter-grid">
+              <label class="field">
+                <span>Buscar</span>
+                <input id="dashboardSearchInput" type="search" placeholder="OS, cliente, WhatsApp ou modelo" />
+              </label>
+              <label class="field">
+                <span>Status</span>
+                <select id="dashboardStatusFilter">
+                  <option value="">Todos</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Data de entrada</span>
+                <input id="dashboardDateFilter" type="date" />
+              </label>
+              <label class="field">
+                <span>Período</span>
+                <select id="dashboardPeriodFilter">
+                  <option value="">Todos</option>
+                  <option value="today">Hoje</option>
+                  <option value="month">Este mês</option>
+                  <option value="year">Este ano</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
           <div class="metric-grid">
             <article class="metric-card">
               <span class="metric-icon blue"><i class="fa-solid fa-folder-open"></i></span>
@@ -135,8 +169,18 @@
             </article>
             <article class="metric-card wide">
               <span class="metric-icon green"><i class="fa-solid fa-brazilian-real-sign"></i></span>
-              <p>Receita estimada</p>
+              <p>Valor total das ordens</p>
               <strong id="metricRevenue">R$ 0,00</strong>
+            </article>
+            <article class="metric-card wide">
+              <span class="metric-icon orange"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+              <p>Despesas em peças</p>
+              <strong id="metricExpenses">R$ 0,00</strong>
+            </article>
+            <article class="metric-card wide">
+              <span class="metric-icon emerald"><i class="fa-solid fa-sack-dollar"></i></span>
+              <p>Lucro mão de obra</p>
+              <strong id="metricProfit">R$ 0,00</strong>
             </article>
           </div>
 
@@ -254,6 +298,34 @@
                 <input id="storeAddressInput" />
               </label>
               <label class="field">
+                <span>CNPJ</span>
+                <input id="storeCnpjInput" />
+              </label>
+              <label class="field">
+                <span>Instagram</span>
+                <input id="storeInstagramInput" placeholder="@loja" />
+              </label>
+              <label class="field">
+                <span>E-mail</span>
+                <input id="storeEmailInput" type="email" />
+              </label>
+              <label class="field">
+                <span>Site</span>
+                <input id="storeSiteInput" placeholder="https://..." />
+              </label>
+              <label class="field">
+                <span>CEP</span>
+                <input id="storeCepInput" />
+              </label>
+              <label class="field">
+                <span>Cidade</span>
+                <input id="storeCityInput" />
+              </label>
+              <label class="field">
+                <span>Estado</span>
+                <input id="storeStateInput" maxlength="2" />
+              </label>
+              <label class="field">
                 <span>WhatsApp</span>
                 <input id="storeWhatsappInput" inputmode="tel" />
               </label>
@@ -368,7 +440,7 @@
           <label class="field span-2"><span>Peças utilizadas</span><textarea id="pecas" rows="2"></textarea></label>
           <label class="field"><span>Valor mão de obra</span><input id="valorMaoObra" class="money-input" inputmode="decimal" placeholder="R$ 0,00" /></label>
           <label class="field"><span>Valor peças</span><input id="valorPecas" class="money-input" inputmode="decimal" placeholder="R$ 0,00" /></label>
-          <label class="field"><span>Valor total</span><input id="valorTotal" class="money-input" inputmode="decimal" placeholder="R$ 0,00" /></label>
+          <label class="field"><span>Valor total</span><input id="valorTotal" class="money-input" inputmode="decimal" placeholder="R$ 0,00" readonly /></label>
           <label class="field"><span>Forma de pagamento</span><input id="formaPagamento" placeholder="Pix, cartão, dinheiro..." /></label>
           <label class="field"><span>Data de entrada</span><input id="dataEntrada" type="date" required /></label>
           <label class="field"><span>Previsão de entrega</span><input id="previsaoEntrega" type="date" /></label>
