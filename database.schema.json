@@ -1,4 +1,4 @@
-{
+﻿{
   "projectId": "anup-os",
   "supportEmail": "g.jesus140606@gmail.com",
   "collections": {
@@ -54,9 +54,24 @@
       "whatsapp": "string",
       "garantiaDias": "number",
       "valorMensal": "number",
+      "tipoPlano": "mensal | anual | unico",
+      "tipoCliente": "b2b | b2c",
+      "valorPagamentoUnico": "number",
+      "valorPlanoAtual": "number",
+      "custoSaasMensal": "number",
+      "investimentoAquisicao": "number",
+      "statusCliente": "ativo | teste | cancelado",
       "formaPagamento": "string",
       "planoVencimento": "YYYY-MM-DD",
       "planoStatus": "em_dia | perto_vencer | devendo",
+      "asaasBillingType": "UNDEFINED | PIX | BOLETO | CREDIT_CARD",
+      "asaasStatus": "pendente | gerado | RECEIVED | CONFIRMED | OVERDUE | string",
+      "asaasCustomerId": "string",
+      "asaasSubscriptionId": "string",
+      "asaasPaymentId": "string",
+      "asaasInvoiceUrl": "string",
+      "trialDias": "number",
+      "trialAte": "YYYY-MM-DD | empty",
       "ativo": "boolean",
       "criadoEm": "timestamp",
       "atualizadoEm": "timestamp"
@@ -70,6 +85,45 @@
       "ativo": "boolean",
       "criadoEm": "timestamp",
       "atualizadoEm": "timestamp"
+    },
+    "avisos/{avisoId}": {
+      "title": "string",
+      "message": "string",
+      "priority": "info | warning | critical",
+      "audience": "all | tenant",
+      "assistenciaId": "string | empty",
+      "ativo": "boolean",
+      "criadoPor": "string",
+      "criadoEm": "timestamp",
+      "atualizadoEm": "timestamp"
+    },
+    "chamados/{chamadoId}": {
+      "subject": "string",
+      "message": "string",
+      "category": "duvida | erro | financeiro | melhoria",
+      "priority": "normal | alta | critica",
+      "status": "aberto | respondido | fechado",
+      "assistenciaId": "string",
+      "assistenciaNome": "string",
+      "lojaId": "string",
+      "lojaNome": "string",
+      "abertoPor": "string",
+      "response": "string",
+      "respondidoPor": "string",
+      "criadoEm": "timestamp",
+      "atualizadoEm": "timestamp"
+    },
+    "asaas_logs/{logId}": {
+      "lojaId": "string",
+      "assistenciaId": "string",
+      "tipoPlano": "mensal | anual | unico",
+      "valor": "number",
+      "billingType": "UNDEFINED | PIX | BOLETO | CREDIT_CARD",
+      "asaasCustomerId": "string",
+      "asaasSubscriptionId": "string",
+      "asaasPaymentId": "string",
+      "criadoPor": "email",
+      "criadoEm": "timestamp"
     },
     "lojas/{lojaId}/clientes/{clienteId}": {
       "nome": "string",

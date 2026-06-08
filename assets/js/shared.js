@@ -1,7 +1,7 @@
-export const SUPPORT_EMAIL = "g.jesus140606@gmail.com";
+﻿export const SUPPORT_EMAIL = "g.jesus140606@gmail.com";
 
 export const USER_ROLES = [
-  { value: "suporte", label: "Suporte Anup OS" },
+  { value: "suporte", label: "Dono Anup OS" },
   { value: "assistencia_admin", label: "Admin da assistência" },
   { value: "loja_admin", label: "Admin da loja" },
   { value: "gerente", label: "Gerente" },

@@ -21,6 +21,29 @@
         { "fieldPath": "assistenciaId", "order": "ASCENDING" },
         { "fieldPath": "email", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "lojas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assistenciaId", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chamados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assistenciaId", "order": "ASCENDING" },
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "avisos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "criadoEm", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

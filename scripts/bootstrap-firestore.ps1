@@ -192,6 +192,12 @@ Set-FirestoreDocument -Token $token -Path "lojas/$lojaId" -Data @{
   whatsapp = ""
   garantiaDias = 90
   valorMensal = 0
+  tipoPlano = "mensal"
+  tipoCliente = "b2b"
+  valorPagamentoUnico = 0
+  custoSaasMensal = 0
+  investimentoAquisicao = 0
+  statusCliente = "ativo"
   formaPagamento = "Interno"
   planoVencimento = $nextDue
   planoStatus = "em_dia"

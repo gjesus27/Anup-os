@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
@@ -54,15 +54,15 @@
         </div>
 
         <nav class="nav-stack" aria-label="Navegação principal">
-          <a href="#dashboard" class="nav-link active" data-section-link="dashboard">
+          <a href="#dashboard" class="nav-link active" data-section-link="dashboard" data-permission="tenant">
             <i class="fa-solid fa-chart-pie"></i>
             Dashboard
           </a>
-          <a href="#ordens" class="nav-link" data-section-link="ordens">
+          <a href="#ordens" class="nav-link" data-section-link="ordens" data-permission="tenant">
             <i class="fa-solid fa-screwdriver-wrench"></i>
             Ordens
           </a>
-          <a href="#clientes" class="nav-link" data-section-link="clientes">
+          <a href="#clientes" class="nav-link" data-section-link="clientes" data-permission="tenant">
             <i class="fa-solid fa-users"></i>
             Clientes
           </a>
@@ -71,8 +71,24 @@
             Administração
           </a>
           <a href="#suporte" class="nav-link" data-section-link="suporte" data-permission="support">
-            <i class="fa-solid fa-headset"></i>
-            Suporte Anup
+            <i class="fa-solid fa-gauge-high"></i>
+            Dashboard SaaS
+          </a>
+          <a href="#saas-assistencias" class="nav-link" data-section-link="saas-assistencias" data-permission="support">
+            <i class="fa-solid fa-building-user"></i>
+            Assistências
+          </a>
+          <a href="#avisos" class="nav-link" data-section-link="avisos">
+            <i class="fa-solid fa-bullhorn"></i>
+            Avisos
+          </a>
+          <a href="#chamados" class="nav-link" data-section-link="chamados">
+            <i class="fa-solid fa-life-ring"></i>
+            Chamados
+          </a>
+          <a href="#saas-config" class="nav-link" data-section-link="saas-config" data-permission="support">
+            <i class="fa-solid fa-sliders"></i>
+            Configurações
           </a>
         </nav>
 
@@ -86,11 +102,15 @@
       <main class="main">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Painel administrativo</p>
-            <h1>Ordens de Serviço</h1>
+            <p class="eyebrow" id="topbarEyebrow">Painel administrativo</p>
+            <h1 id="topbarTitle">Ordens de Serviço</h1>
           </div>
           <div class="topbar-actions">
             <select id="storeSelector" class="topbar-select" aria-label="Selecionar loja"></select>
+            <button class="btn btn-ghost hidden" id="ownerCentralBtn" type="button">
+              <i class="fa-solid fa-table-columns"></i>
+              Central SaaS
+            </button>
             <button class="btn btn-ghost" id="refreshBtn" type="button">
               <i class="fa-solid fa-rotate"></i>
               Atualizar
@@ -338,6 +358,54 @@
                 <input id="storeMonthlyPriceInput" class="money-input" inputmode="decimal" />
               </label>
               <label class="field" data-support-billing>
+                <span>Tipo de plano</span>
+                <select id="storePlanTypeInput">
+                  <option value="mensal">Mensalista</option>
+                  <option value="anual">Anual recorrente</option>
+                  <option value="unico">Pagamento único</option>
+                </select>
+              </label>
+              <label class="field" data-support-billing>
+                <span>Tipo de cliente</span>
+                <select id="storeClientTypeInput">
+                  <option value="b2b">B2B</option>
+                  <option value="b2c">B2C</option>
+                </select>
+              </label>
+              <label class="field" data-support-billing>
+                <span>Valor pago uma vez</span>
+                <input id="storeOneShotValueInput" class="money-input" inputmode="decimal" />
+              </label>
+              <label class="field" data-support-billing>
+                <span>Custo mensal Anup</span>
+                <input id="storeSaasCostInput" class="money-input" inputmode="decimal" />
+              </label>
+              <label class="field" data-support-billing>
+                <span>Investimento/CAC</span>
+                <input id="storeSaasInvestmentInput" class="money-input" inputmode="decimal" />
+              </label>
+              <label class="field" data-support-billing>
+                <span>Status do cliente</span>
+                <select id="storeCustomerStatusInput">
+                  <option value="ativo">Ativo</option>
+                  <option value="teste">Teste</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </label>
+              <label class="field" data-support-billing>
+                <span>Tipo cobrança Asaas</span>
+                <select id="storeAsaasBillingTypeInput">
+                  <option value="UNDEFINED">Cliente escolhe</option>
+                  <option value="PIX">Pix</option>
+                  <option value="BOLETO">Boleto</option>
+                  <option value="CREDIT_CARD">Cartão recorrente</option>
+                </select>
+              </label>
+              <label class="field" data-support-billing>
+                <span>Dias de teste grátis</span>
+                <input id="storeTrialDaysInput" type="number" min="0" value="30" />
+              </label>
+              <label class="field" data-support-billing>
                 <span>Forma de pagamento do plano</span>
                 <input id="storePaymentMethodInput" />
               </label>
@@ -351,8 +419,23 @@
                   <option value="em_dia">Em dia</option>
                   <option value="perto_vencer">Perto de vencer</option>
                   <option value="devendo">Devendo</option>
+                  <option value="cancelado">Cancelado</option>
                 </select>
               </label>
+              <div class="billing-summary span-2" data-support-billing>
+                <div>
+                  <span>Asaas</span>
+                  <strong id="storeAsaasStatusText">Não gerado</strong>
+                </div>
+                <a class="btn btn-ghost hidden" id="storeAsaasInvoiceLink" href="#" target="_blank" rel="noopener">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                  Abrir cobrança
+                </a>
+                <button class="btn btn-primary" id="generateAsaasBillingBtn" type="button">
+                  <i class="fa-solid fa-brazilian-real-sign"></i>
+                  Gerar cobrança Asaas
+                </button>
+              </div>
               <button class="btn btn-primary span-2" type="submit">
                 <i class="fa-solid fa-floppy-disk"></i>
                 Salvar dados da loja
@@ -376,28 +459,64 @@
             <div class="panel-header">
               <div>
                 <p class="eyebrow">Anup OS</p>
-                <h2>Visão geral do SaaS</h2>
+                <h2>Gestão do SaaS</h2>
               </div>
               <button class="btn btn-primary" id="newTenantBtn" type="button">
                 <i class="fa-solid fa-building-circle-arrow-right"></i>
                 Nova assistência/loja
               </button>
             </div>
+            <div class="filter-grid support-filter-grid">
+              <label class="field span-2">
+                <span>Buscar assistência ou loja</span>
+                <input id="supportSearchInput" type="search" placeholder="Nome da assistência, loja ou pagamento" />
+              </label>
+              <label class="field">
+                <span>Situação do plano</span>
+                <select id="supportPaymentFilter">
+                  <option value="">Todas</option>
+                  <option value="paid">Em dia</option>
+                  <option value="soon">Perto de vencer</option>
+                  <option value="overdue">Devendo</option>
+                  <option value="canceled">Canceladas</option>
+                </select>
+              </label>
+            </div>
             <div class="metric-grid support-metrics">
               <article class="metric-card">
-                <span class="metric-icon blue"><i class="fa-solid fa-store"></i></span>
-                <p>Lojas</p>
-                <strong id="metricStores">0</strong>
+                <span class="metric-icon blue"><i class="fa-solid fa-building-user"></i></span>
+                <p>Assistências</p>
+                <strong id="metricActiveTenants">0</strong>
               </article>
               <article class="metric-card">
-                <span class="metric-icon emerald"><i class="fa-solid fa-circle-check"></i></span>
-                <p>Em dia</p>
-                <strong id="metricPaid">0</strong>
+                <span class="metric-icon cyan"><i class="fa-solid fa-store"></i></span>
+                <p>Contas ativas</p>
+                <strong id="metricActiveStores">0</strong>
               </article>
               <article class="metric-card">
-                <span class="metric-icon amber"><i class="fa-solid fa-clock"></i></span>
-                <p>Perto de vencer</p>
-                <strong id="metricDueSoon">0</strong>
+                <span class="metric-icon emerald"><i class="fa-solid fa-brazilian-real-sign"></i></span>
+                <p>MRR mensalistas</p>
+                <strong id="metricMrr">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-icon green"><i class="fa-solid fa-chart-line"></i></span>
+                <p>ARR projetado</p>
+                <strong id="metricArr">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-icon violet"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+                <p>Pagamentos únicos</p>
+                <strong id="metricOneShotRevenue">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-icon blue"><i class="fa-solid fa-cash-register"></i></span>
+                <p>Faturamento SaaS</p>
+                <strong id="metricTotalSaasRevenue">R$ 0,00</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-icon emerald"><i class="fa-solid fa-sack-dollar"></i></span>
+                <p>Lucro SaaS</p>
+                <strong id="metricSaasProfit">R$ 0,00</strong>
               </article>
               <article class="metric-card">
                 <span class="metric-icon orange"><i class="fa-solid fa-triangle-exclamation"></i></span>
@@ -405,7 +524,159 @@
                 <strong id="metricOverdue">0</strong>
               </article>
             </div>
+            <div class="saas-kpi-grid">
+              <article><span>Churn</span><strong id="metricChurn">0%</strong></article>
+              <article><span>Margem</span><strong id="metricSaasMargin">0%</strong></article>
+              <article><span>ROI</span><strong id="metricSaasRoi">0%</strong></article>
+              <article><span>KPI saúde</span><strong id="metricKpiHealth">0%</strong></article>
+              <article><span>B2B</span><strong id="metricB2B">0</strong></article>
+              <article><span>B2C</span><strong id="metricB2C">0</strong></article>
+            </div>
+            <div class="support-section-head">
+              <div>
+                <p class="eyebrow">Clientes do SaaS</p>
+                <h3>Assistências e lojas cadastradas</h3>
+              </div>
+              <span id="supportListCount" class="support-count">0 lojas</span>
+            </div>
             <div id="supportList" class="support-list"></div>
+          </div>
+        </section>
+
+        <section id="saas-assistencias" class="view-section">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Base de clientes</p>
+                <h2>Assistências do SaaS</h2>
+              </div>
+              <button class="btn btn-primary" id="newTenantBtnSecondary" type="button">
+                <i class="fa-solid fa-plus"></i>
+                Nova assistência/loja
+              </button>
+            </div>
+            <div id="saasTenantsList" class="support-list"></div>
+          </div>
+        </section>
+
+        <section id="avisos" class="view-section">
+          <div class="panel" data-permission="support">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Comunicados</p>
+                <h2>Lançar aviso para assistências</h2>
+              </div>
+            </div>
+            <form id="noticeForm" class="form-grid">
+              <label class="field span-2">
+                <span>Título</span>
+                <input id="noticeTitle" required />
+              </label>
+              <label class="field">
+                <span>Prioridade</span>
+                <select id="noticePriority">
+                  <option value="info">Informativo</option>
+                  <option value="warning">Importante</option>
+                  <option value="critical">Crítico</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Destino</span>
+                <select id="noticeAudience">
+                  <option value="all">Todas as assistências</option>
+                  <option value="tenant">Assistência selecionada</option>
+                </select>
+              </label>
+              <label class="field span-2">
+                <span>Assistência específica</span>
+                <select id="noticeTenant"></select>
+              </label>
+              <label class="field span-2">
+                <span>Mensagem</span>
+                <textarea id="noticeMessage" rows="3" required></textarea>
+              </label>
+              <button class="btn btn-primary span-2" type="submit">
+                <i class="fa-solid fa-paper-plane"></i>
+                Publicar aviso
+              </button>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Mural</p>
+                <h2>Avisos ativos</h2>
+              </div>
+            </div>
+            <div id="noticeList" class="notice-list"></div>
+          </div>
+        </section>
+
+        <section id="chamados" class="view-section">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Suporte</p>
+                <h2>Chamados</h2>
+              </div>
+            </div>
+            <form id="ticketForm" class="form-grid" data-permission="tenant">
+              <label class="field">
+                <span>Assunto</span>
+                <input id="ticketSubject" required />
+              </label>
+              <label class="field">
+                <span>Categoria</span>
+                <select id="ticketCategory">
+                  <option value="duvida">Dúvida</option>
+                  <option value="erro">Erro</option>
+                  <option value="financeiro">Financeiro</option>
+                  <option value="melhoria">Melhoria</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Prioridade</span>
+                <select id="ticketPriority">
+                  <option value="normal">Normal</option>
+                  <option value="alta">Alta</option>
+                  <option value="critica">Crítica</option>
+                </select>
+              </label>
+              <label class="field span-2">
+                <span>Mensagem</span>
+                <textarea id="ticketMessage" rows="3" required></textarea>
+              </label>
+              <button class="btn btn-primary span-2" type="submit">
+                <i class="fa-solid fa-plus"></i>
+                Abrir chamado
+              </button>
+            </form>
+            <div id="ticketList" class="ticket-list"></div>
+          </div>
+        </section>
+
+        <section id="saas-config" class="view-section">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Dono Anup OS</p>
+                <h2>Configurações do SaaS</h2>
+              </div>
+            </div>
+            <div class="admin-grid">
+              <article class="admin-card">
+                <div>
+                  <h3>Modelo multi-tenant</h3>
+                  <p>Assistências acessam apenas as lojas do próprio `assistenciaId`; o dono Anup tem visão global.</p>
+                </div>
+              </article>
+              <article class="admin-card">
+                <div>
+                  <h3>Operação de suporte</h3>
+                  <p>Entrar em uma loja é uma ação pontual para atendimento, não a tela padrão do dono do SaaS.</p>
+                </div>
+              </article>
+            </div>
           </div>
         </section>
       </main>
@@ -519,9 +790,37 @@
           <label class="field"><span>Assistência existente</span><select id="tenantExisting"><option value="">Criar nova assistência</option></select></label>
           <label class="field"><span>Nome da assistência</span><input id="tenantName" /></label>
           <label class="field"><span>Nome da loja</span><input id="tenantStoreName" required /></label>
+          <label class="field"><span>CPF/CNPJ do pagador</span><input id="tenantBillingDocument" required inputmode="numeric" /></label>
+          <label class="field"><span>E-mail financeiro</span><input id="tenantBillingEmail" type="email" required /></label>
+          <label class="field"><span>WhatsApp financeiro</span><input id="tenantBillingPhone" required inputmode="tel" /></label>
+          <label class="field">
+            <span>Tipo de plano</span>
+            <select id="tenantPlanType">
+              <option value="mensal">Mensalista</option>
+              <option value="anual">Anual recorrente</option>
+              <option value="unico">Pagamento único</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Tipo de cliente</span>
+            <select id="tenantClientType">
+              <option value="b2b">B2B</option>
+              <option value="b2c">B2C</option>
+            </select>
+          </label>
           <label class="field"><span>Valor mensal</span><input id="tenantMonthlyPrice" class="money-input" inputmode="decimal" /></label>
-          <label class="field"><span>Forma de pagamento</span><input id="tenantPaymentMethod" placeholder="Pix, boleto, cartão..." /></label>
-          <label class="field"><span>Vencimento</span><input id="tenantDueDate" type="date" required /></label>
+          <label class="field"><span>Valor pago uma vez</span><input id="tenantOneShotValue" class="money-input" inputmode="decimal" /></label>
+          <label class="field">
+            <span>Tipo cobrança Asaas</span>
+            <select id="tenantBillingType">
+              <option value="UNDEFINED">Cliente escolhe</option>
+              <option value="PIX">Pix</option>
+              <option value="BOLETO">Boleto</option>
+              <option value="CREDIT_CARD">Cartão recorrente</option>
+            </select>
+          </label>
+          <label class="field"><span>Teste grátis em dias</span><input id="tenantTrialDays" type="number" min="0" value="30" /></label>
+          <label class="field"><span>Vencimento/1ª cobrança</span><input id="tenantDueDate" type="date" required /></label>
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" type="button" data-close-modal="tenantModal">Cancelar</button>

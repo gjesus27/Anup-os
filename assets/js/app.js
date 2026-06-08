@@ -27,6 +27,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  functions,
+  httpsCallable,
   onAuthStateChanged,
   onSnapshot,
   orderBy,
@@ -41,14 +43,19 @@ import {
   where,
 } from "./firebase.js";
 
+const createAsaasBilling = httpsCallable(functions, "createAsaasBilling");
+
 let orders = [];
 let clients = [];
 let users = [];
 let stores = [];
 let tenants = [];
+let notices = [];
+let tickets = [];
 let currentUser = null;
 let profile = null;
 let activeStoreId = "";
+let activeSupportAssistanceId = "";
 let currentStatusBeforeEdit = "";
 let unsubscribers = [];
 
@@ -68,12 +75,21 @@ const refs = {
   clientForm: $("#clientForm"),
   userForm: $("#userForm"),
   tenantForm: $("#tenantForm"),
+  noticeForm: $("#noticeForm"),
+  ticketForm: $("#ticketForm"),
   storeForm: $("#storeForm"),
   ordersTable: $("#ordersTable"),
   recentOrders: $("#recentOrders"),
   clientsList: $("#clientsList"),
   usersList: $("#usersList"),
   supportList: $("#supportList"),
+  supportListCount: $("#supportListCount"),
+  supportSearchInput: $("#supportSearchInput"),
+  supportPaymentFilter: $("#supportPaymentFilter"),
+  saasTenantsList: $("#saasTenantsList"),
+  noticeList: $("#noticeList"),
+  noticeTenant: $("#noticeTenant"),
+  ticketList: $("#ticketList"),
   loadingState: $("#loadingState"),
   emptyState: $("#emptyState"),
   searchInput: $("#searchInput"),
@@ -108,12 +124,26 @@ function canManage() {
   return isSupport() || ["assistencia_admin", "loja_admin"].includes(profile?.role);
 }
 
+function isSupportInTenantContext() {
+  return isSupport() && Boolean(activeSupportAssistanceId || activeStoreId);
+}
+
+function isAssistanceAdmin() {
+  return profile?.role === "assistencia_admin";
+}
+
 function canWriteOrders() {
   return isSupport() || !["financeiro", "leitura"].includes(profile?.role);
 }
 
 function activeStore() {
   return stores.find((store) => store.id === activeStoreId);
+}
+
+function activeAssistance() {
+  const store = activeStore();
+  const assistanceId = activeSupportAssistanceId || store?.assistenciaId || profile?.assistenciaId;
+  return tenants.find((tenant) => tenant.id === assistanceId);
 }
 
 function storePath(...parts) {
@@ -155,7 +185,7 @@ function bindNavigation() {
 
 function showSection(target) {
   if (target === "admin" && !canManage()) return;
-  if (target === "suporte" && !isSupport()) return;
+  if (["suporte", "saas-assistencias", "saas-config"].includes(target) && !isSupport()) return;
   $$(".view-section").forEach((section) => section.classList.remove("is-visible"));
   $(`#${target}`)?.classList.add("is-visible");
   $$(".nav-link").forEach((nav) => nav.classList.toggle("active", nav.dataset.sectionLink === target));
@@ -163,7 +193,7 @@ function showSection(target) {
 }
 
 function bindMasks() {
-  ["#clienteWhatsapp", "#clientWhatsapp", "#storeWhatsappInput"].forEach((selector) => {
+  ["#clienteWhatsapp", "#clientWhatsapp", "#storeWhatsappInput", "#tenantBillingPhone"].forEach((selector) => {
     $(selector).addEventListener("input", (event) => {
       event.target.value = maskPhone(event.target.value);
     });
@@ -182,6 +212,27 @@ function bindMasks() {
 function updateTotal() {
   const total = parseCurrency($("#valorMaoObra").value) + parseCurrency($("#valorPecas").value);
   $("#valorTotal").value = currency(total);
+}
+
+function addDaysISO(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
+function planValue(planType, monthlyValue, oneShotValue) {
+  if (planType === "unico") return Number(oneShotValue || 0);
+  if (planType === "anual") return Number(monthlyValue || 0) * 12;
+  return Number(monthlyValue || 0);
+}
+
+function billingTypeLabel(type) {
+  return {
+    UNDEFINED: "Cliente escolhe",
+    PIX: "Pix",
+    BOLETO: "Boleto",
+    CREDIT_CARD: "Cartão recorrente",
+  }[type || "UNDEFINED"];
 }
 
 async function login(event) {
@@ -211,7 +262,7 @@ async function loadProfile(user) {
 
   if (user.email?.toLowerCase() === SUPPORT_EMAIL) {
     const data = {
-      nome: "Suporte Anup OS",
+      nome: "Dono Anup OS",
       email: user.email.toLowerCase(),
       role: "suporte",
       assistenciaId: null,
@@ -231,6 +282,15 @@ async function loadStores() {
   if (isSupport()) {
     const snapshot = await getDocs(query(collection(db, "lojas"), orderBy("nome")));
     stores = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    activeStoreId = "";
+    activeSupportAssistanceId = "";
+    renderStoreSelector();
+    return;
+  }
+
+  if (isAssistanceAdmin()) {
+    const snapshot = await getDocs(query(collection(db, "lojas"), where("assistenciaId", "==", profile.assistenciaId), orderBy("nome")));
+    stores = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
   } else {
     if (!profile?.lojaIds?.length) {
       stores = [];
@@ -240,15 +300,23 @@ async function loadStores() {
     stores = results.filter((item) => item.exists()).map((item) => ({ id: item.id, ...item.data() }));
   }
   activeStoreId = stores[0]?.id || "";
+  activeSupportAssistanceId = "";
   renderStoreSelector();
 }
 
 function renderShell() {
   refs.authScreen.classList.add("hidden");
   refs.appShell.classList.remove("hidden");
+  const supportContext = isSupportInTenantContext();
   $$("[data-permission='support']").forEach((item) => item.classList.toggle("hidden", !isSupport()));
-  $$("[data-permission='manage']").forEach((item) => item.classList.toggle("hidden", !canManage()));
+  $$("[data-permission='tenant']").forEach((item) => item.classList.toggle("hidden", isSupport() && !supportContext));
+  $$("[data-permission='manage']").forEach((item) =>
+    item.classList.toggle("hidden", !canManage() || (isSupport() && !supportContext))
+  );
+  refs.ticketForm?.classList.toggle("hidden", isSupport());
   $$("[data-support-billing]").forEach((item) => item.classList.toggle("hidden", !isSupport()));
+  $("#storeSelector").classList.toggle("hidden", isSupport() && !supportContext);
+  $("#ownerCentralBtn")?.classList.toggle("hidden", !(isSupport() && supportContext));
   $("#newOrderBtn").disabled = !canWriteOrders();
   $("#newOrderBtnSecondary").disabled = !canWriteOrders();
   fillRoleOptions();
@@ -257,21 +325,102 @@ function renderShell() {
 
 function renderBrand() {
   const store = activeStore();
+  const assistance = activeAssistance();
+  const supportContext = isSupportInTenantContext();
+  const canOperateStore = Boolean(activeStoreId) && canWriteOrders();
+  $("#storeSelector").classList.toggle("hidden", isSupport() && !supportContext);
+  $("#ownerCentralBtn")?.classList.toggle("hidden", !(isSupport() && supportContext));
+  $("#newOrderBtn").disabled = !canOperateStore;
+  $("#newOrderBtnSecondary").disabled = !canOperateStore;
+  if (isSupport() && !supportContext) {
+    $("#brandTitle").textContent = "Anup OS";
+    $("#brandSubtitle").textContent = "Dono do SaaS";
+    $("#brandMark").textContent = "A";
+    $("#sidebarStoreName").textContent = "Central Anup OS";
+    $("#sidebarStoreText").textContent = "Gestão global do SaaS, faturamento, clientes e suporte.";
+    $("#topbarEyebrow").textContent = "Dono Anup OS";
+    $("#topbarTitle").textContent = "Gestão do SaaS";
+    return;
+  }
+  if (isSupport() && supportContext && !store) {
+    $("#brandTitle").textContent = assistance?.nome || "Assistência";
+    $("#brandSubtitle").textContent = "Suporte Anup OS";
+    $("#brandMark").textContent = (assistance?.nome || "A").slice(0, 1).toUpperCase();
+    $("#sidebarStoreName").textContent = assistance?.nome || "Assistência selecionada";
+    $("#sidebarStoreText").textContent = "Suporte completo na assistência selecionada.";
+    $("#topbarEyebrow").textContent = "Suporte em assistência";
+    $("#topbarTitle").textContent = assistance?.nome || "Assistência";
+    return;
+  }
   $("#brandTitle").textContent = store?.nome || "Anup OS";
   $("#brandSubtitle").textContent = profile?.nome || "Ordens de Serviço";
   $("#brandMark").textContent = (store?.nome || "Anup OS").slice(0, 1).toUpperCase();
   $("#sidebarStoreName").textContent = store?.nome || "Nenhuma loja liberada";
-  $("#sidebarStoreText").textContent = store?.assistenciaNome || "Selecione uma loja para operar.";
+  $("#sidebarStoreText").textContent = isSupport()
+    ? `Suporte completo em ${assistance?.nome || store?.assistenciaNome || "assistência"}`
+    : store?.assistenciaNome || "Selecione uma loja para operar.";
+  $("#topbarEyebrow").textContent = isSupport() ? "Suporte em loja" : "Painel administrativo";
+  $("#topbarTitle").textContent = store?.nome || "Ordens de Serviço";
 }
 
 function renderStoreSelector() {
+  const supportOption = isSupport() ? `<option value="">Central do SaaS</option>` : "";
+  const selectorStores =
+    isSupport() && activeSupportAssistanceId
+      ? stores.filter((store) => store.assistenciaId === activeSupportAssistanceId)
+      : stores;
   refs.storeSelector.innerHTML =
-    stores.map((store) => `<option value="${store.id}">${escapeHtml(store.nome)}</option>`).join("") ||
-    `<option value="">Sem loja</option>`;
+    supportOption +
+    (selectorStores.map((store) => `<option value="${store.id}">${escapeHtml(store.nome)}</option>`).join("") ||
+      `<option value="">Sem loja</option>`);
   refs.storeSelector.value = activeStoreId;
   renderBrand();
   fillStoreFields();
   fillUserStores();
+}
+
+function enterSupportStore(storeId) {
+  if (!isSupport()) return;
+  const store = stores.find((item) => item.id === storeId);
+  if (!store) return toast("Loja não encontrada para suporte.", "error");
+  activeStoreId = store.id;
+  activeSupportAssistanceId = store.assistenciaId || "";
+  renderShell();
+  renderStoreSelector();
+  subscribeStoreData();
+  showSection("dashboard");
+}
+
+function enterSupportAssistance(assistanceId) {
+  if (!isSupport()) return;
+  const tenantStores = stores.filter((store) => store.assistenciaId === assistanceId);
+  activeSupportAssistanceId = assistanceId;
+  activeStoreId = tenantStores[0]?.id || "";
+  renderShell();
+  renderStoreSelector();
+  subscribeStoreData();
+  showSection(activeStoreId ? "dashboard" : "admin");
+}
+
+function returnToSaasCentral() {
+  if (!isSupport()) return;
+  activeSupportAssistanceId = "";
+  activeStoreId = "";
+  renderShell();
+  renderStoreSelector();
+  subscribeStoreData();
+  showSection("suporte");
+}
+
+function openTenantModal(existingAssistanceId = "") {
+  fillTenantOptions();
+  refs.tenantForm.reset();
+  $("#tenantTrialDays").value = "30";
+  $("#tenantDueDate").value = addDaysISO(30);
+  $("#tenantBillingType").value = "UNDEFINED";
+  $("#tenantExisting").value = existingAssistanceId;
+  $("#tenantExisting").dispatchEvent(new Event("change"));
+  refs.tenantModal.showModal();
 }
 
 function fillStoreFields() {
@@ -289,13 +438,31 @@ function fillStoreFields() {
   $("#storeWhatsappInput").value = maskPhone(store?.whatsapp || "");
   $("#storeWarrantyInput").value = store?.garantiaDias || 90;
   $("#storeMonthlyPriceInput").value = store?.valorMensal ? currency(store.valorMensal) : "";
+  $("#storePlanTypeInput").value = store?.tipoPlano || "mensal";
+  $("#storeClientTypeInput").value = store?.tipoCliente || "b2b";
+  $("#storeOneShotValueInput").value = store?.valorPagamentoUnico ? currency(store.valorPagamentoUnico) : "";
+  $("#storeSaasCostInput").value = store?.custoSaasMensal ? currency(store.custoSaasMensal) : "";
+  $("#storeSaasInvestmentInput").value = store?.investimentoAquisicao ? currency(store.investimentoAquisicao) : "";
+  $("#storeCustomerStatusInput").value = store?.statusCliente || "ativo";
+  $("#storeAsaasBillingTypeInput").value = store?.asaasBillingType || "UNDEFINED";
+  $("#storeTrialDaysInput").value = Number(store?.trialDias ?? 30);
   $("#storePaymentMethodInput").value = store?.formaPagamento || "";
   $("#storeDueDateInput").value = store?.planoVencimento || "";
   $("#storePlanStatusInput").value = store?.planoStatus || "em_dia";
+  $("#storeAsaasStatusText").textContent = store?.asaasStatus
+    ? `${store.asaasStatus} · ${billingTypeLabel(store.asaasBillingType)}`
+    : "Não gerado";
+  const invoiceLink = $("#storeAsaasInvoiceLink");
+  invoiceLink.classList.toggle("hidden", !store?.asaasInvoiceUrl);
+  if (store?.asaasInvoiceUrl) invoiceLink.href = store.asaasInvoiceUrl;
 }
 
 function fillUserStores(selected = []) {
-  $("#userStores").innerHTML = stores
+  const availableStores =
+    isSupport() && activeSupportAssistanceId
+      ? stores.filter((store) => store.assistenciaId === activeSupportAssistanceId)
+      : stores;
+  $("#userStores").innerHTML = availableStores
     .map((store) => `<option value="${store.id}" ${selected.includes(store.id) ? "selected" : ""}>${escapeHtml(store.nome)}</option>`)
     .join("");
 }
@@ -304,6 +471,11 @@ function fillTenantOptions() {
   $("#tenantExisting").innerHTML =
     `<option value="">Criar nova assistência</option>` +
     tenants.map((tenant) => `<option value="${tenant.id}">${escapeHtml(tenant.nome)}</option>`).join("");
+  if (refs.noticeTenant) {
+    refs.noticeTenant.innerHTML =
+      `<option value="">Selecione uma assistência</option>` +
+      tenants.map((tenant) => `<option value="${tenant.id}">${escapeHtml(tenant.nome)}</option>`).join("");
+  }
 }
 
 function subscribeStoreData() {
@@ -315,6 +487,8 @@ function subscribeStoreData() {
   renderOrders();
   renderClients();
   if (isSupport()) subscribeSupport();
+  subscribeNotices();
+  subscribeTickets();
   if (!activeStoreId) return;
 
   refs.loadingState.classList.remove("hidden");
@@ -361,9 +535,9 @@ function subscribeSupport() {
   unsubscribers.push(
     onSnapshot(query(collection(db, "lojas"), orderBy("nome")), (snapshot) => {
       stores = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-      if (!activeStoreId && stores[0]) activeStoreId = stores[0].id;
       renderStoreSelector();
       renderSupport();
+      renderSaasTenants();
     })
   );
   unsubscribers.push(
@@ -371,6 +545,7 @@ function subscribeSupport() {
       tenants = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
       fillTenantOptions();
       renderSupport();
+      renderSaasTenants();
     })
   );
 }
@@ -378,6 +553,10 @@ function subscribeSupport() {
 function openOrderModal(order = null) {
   if (!canWriteOrders()) {
     toast("Seu nível permite apenas consulta.", "error");
+    return;
+  }
+  if (!activeStoreId) {
+    toast("Entre em uma loja antes de criar uma OS.", "error");
     return;
   }
   const store = activeStore();
@@ -599,6 +778,33 @@ function filteredOrders() {
   });
 }
 
+function subscribeNotices() {
+  const noticesQuery = query(collection(db, "avisos"), orderBy("criadoEm", "desc"));
+  unsubscribers.push(
+    onSnapshot(noticesQuery, (snapshot) => {
+      const allNotices = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      notices = isSupport()
+        ? allNotices
+        : allNotices.filter(
+            (notice) => notice.audience === "all" || notice.assistenciaId === profile?.assistenciaId
+          );
+      renderNotices();
+    })
+  );
+}
+
+function subscribeTickets() {
+  const ticketsQuery = isSupport()
+    ? query(collection(db, "chamados"), orderBy("criadoEm", "desc"))
+    : query(collection(db, "chamados"), where("assistenciaId", "==", profile.assistenciaId), orderBy("criadoEm", "desc"));
+  unsubscribers.push(
+    onSnapshot(ticketsQuery, (snapshot) => {
+      tickets = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      renderTickets();
+    })
+  );
+}
+
 function dashboardFilteredOrders() {
   const term = refs.dashboardSearchInput.value.toLowerCase().trim();
   const status = refs.dashboardStatusFilter.value;
@@ -711,6 +917,7 @@ function renderUsers() {
 }
 
 function paymentState(store) {
+  if (store.statusCliente === "cancelado" || store.planoStatus === "cancelado") return "canceled";
   const due = new Date(`${store.planoVencimento || todayISO()}T00:00:00`);
   const days = Math.ceil((due - new Date()) / 86400000);
   if (store.planoStatus === "devendo" || days < 0) return "overdue";
@@ -719,33 +926,225 @@ function paymentState(store) {
   return "paid";
 }
 
+function paymentStateLabel(state) {
+  const labels = {
+    paid: "Em dia",
+    soon: "Perto de vencer",
+    overdue: "Devendo",
+    canceled: "Cancelada",
+  };
+  return labels[state] || "Em dia";
+}
+
+function percent(value) {
+  return `${Number(value || 0).toLocaleString("pt-BR", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  })}%`;
+}
+
 function renderSupport() {
   if (!isSupport()) return;
-  const paid = stores.filter((store) => paymentState(store) === "paid").length;
-  const soon = stores.filter((store) => paymentState(store) === "soon").length;
-  const overdue = stores.filter((store) => paymentState(store) === "overdue").length;
-  $("#metricStores").textContent = stores.length;
-  $("#metricPaid").textContent = paid;
-  $("#metricDueSoon").textContent = soon;
+  const term = refs.supportSearchInput?.value.toLowerCase().trim() || "";
+  const paymentFilter = refs.supportPaymentFilter?.value || "";
+  const activeStores = stores.filter((store) => store.statusCliente !== "cancelado" && store.planoStatus !== "cancelado");
+  const canceledStores = stores.filter((store) => store.statusCliente === "cancelado" || store.planoStatus === "cancelado");
+  const activeTenantIds = new Set(activeStores.map((store) => store.assistenciaId).filter(Boolean));
+  const recurringStores = activeStores.filter((store) => (store.tipoPlano || "mensal") !== "unico");
+  const oneShotStores = activeStores.filter((store) => (store.tipoPlano || "mensal") === "unico");
+  const mrr = recurringStores.reduce((sum, store) => sum + Number(store.valorMensal || 0), 0);
+  const arr = mrr * 12;
+  const oneShotRevenue = oneShotStores.reduce(
+    (sum, store) => sum + Number(store.valorPagamentoUnico || store.valorMensal || 0),
+    0
+  );
+  const totalRevenue = mrr + oneShotRevenue;
+  const operatingCost = activeStores.reduce((sum, store) => sum + Number(store.custoSaasMensal || 0), 0);
+  const acquisitionInvestment = activeStores.reduce((sum, store) => sum + Number(store.investimentoAquisicao || 0), 0);
+  const profit = totalRevenue - operatingCost;
+  const margin = totalRevenue ? (profit / totalRevenue) * 100 : 0;
+  const roi = acquisitionInvestment ? ((profit - acquisitionInvestment) / acquisitionInvestment) * 100 : profit > 0 ? 100 : 0;
+  const churn = stores.length ? (canceledStores.length / stores.length) * 100 : 0;
+  const b2b = activeStores.filter((store) => (store.tipoCliente || "b2b") === "b2b").length;
+  const b2c = activeStores.filter((store) => (store.tipoCliente || "b2b") === "b2c").length;
+  const overdue = activeStores.filter((store) => paymentState(store) === "overdue").length;
+  const healthy = activeStores.length ? ((activeStores.length - overdue) / activeStores.length) * 100 : 0;
+  const filteredStores = stores.filter((store) => {
+    const tenant = tenants.find((item) => item.id === store.assistenciaId);
+    const state = paymentState(store);
+    const haystack = [
+      store.nome,
+      store.assistenciaNome,
+      tenant?.nome,
+      store.formaPagamento,
+      store.planoStatus,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return (!term || haystack.includes(term)) && (!paymentFilter || state === paymentFilter);
+  });
+  $("#metricActiveTenants").textContent = activeTenantIds.size || tenants.length;
+  $("#metricActiveStores").textContent = activeStores.length;
+  $("#metricMrr").textContent = currency(mrr);
+  $("#metricArr").textContent = currency(arr);
+  $("#metricOneShotRevenue").textContent = currency(oneShotRevenue);
+  $("#metricTotalSaasRevenue").textContent = currency(totalRevenue);
+  $("#metricSaasProfit").textContent = currency(profit);
   $("#metricOverdue").textContent = overdue;
+  $("#metricChurn").textContent = percent(churn);
+  $("#metricSaasMargin").textContent = percent(margin);
+  $("#metricSaasRoi").textContent = percent(roi);
+  $("#metricKpiHealth").textContent = percent(healthy);
+  $("#metricB2B").textContent = b2b;
+  $("#metricB2C").textContent = b2c;
+  refs.supportListCount.textContent = `${filteredStores.length} ${filteredStores.length === 1 ? "loja" : "lojas"}`;
+
+  const storesByTenant = filteredStores.reduce((groups, store) => {
+    const key = store.assistenciaId || "sem_assistencia";
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(store);
+    return groups;
+  }, {});
+
   refs.supportList.innerHTML =
-    stores
-      .map((store) => {
-        const state = paymentState(store);
-        const tenant = tenants.find((item) => item.id === store.assistenciaId);
-        return `<article class="support-card ${state}">
-          <div>
-            <h3>${escapeHtml(store.nome)}</h3>
-            <p>${escapeHtml(tenant?.nome || store.assistenciaNome || "Assistência sem nome")}</p>
-            <p>${escapeHtml(store.formaPagamento || "Pagamento não informado")} · ${currency(store.valorMensal || 0)} · vence ${formatDate(store.planoVencimento)}</p>
+    Object.entries(storesByTenant)
+      .map(([tenantId, tenantStores]) => {
+        const tenant = tenants.find((item) => item.id === tenantId);
+        const tenantName = tenant?.nome || tenantStores[0]?.assistenciaNome || "Assistência sem cadastro";
+        const totalMonthly = tenantStores
+          .filter((store) => (store.tipoPlano || "mensal") !== "unico")
+          .reduce((sum, store) => sum + Number(store.valorMensal || 0), 0);
+        const totalOneShot = tenantStores
+          .filter((store) => (store.tipoPlano || "mensal") === "unico")
+          .reduce((sum, store) => sum + Number(store.valorPagamentoUnico || store.valorMensal || 0), 0);
+        const overdueCount = tenantStores.filter((store) => paymentState(store) === "overdue").length;
+        return `<article class="support-tenant">
+          <div class="support-tenant-head">
+            <div>
+              <h3>${escapeHtml(tenantName)}</h3>
+              <p>${tenantStores.length} ${tenantStores.length === 1 ? "loja" : "lojas"} · MRR ${currency(totalMonthly)} · Único ${currency(totalOneShot)} · ${overdueCount} devendo</p>
+            </div>
+            ${
+              tenantId !== "sem_assistencia"
+                ? `<button class="btn btn-ghost" data-saas-action="enter-tenant" data-id="${tenantId}">
+              <i class="fa-solid fa-building-user"></i>
+              Entrar na assistência
+            </button>`
+                : ""
+            }
           </div>
-          <button class="btn btn-primary" data-support-action="enter-store" data-id="${store.id}">
-            <i class="fa-solid fa-right-to-bracket"></i>
-            Entrar na loja
-          </button>
+          <div class="support-store-list">
+            ${tenantStores.map(renderSupportStore).join("")}
+          </div>
         </article>`;
       })
-      .join("") || emptyMini("Nenhuma loja cadastrada.");
+      .join("") || emptyMini("Nenhuma loja encontrada.");
+}
+
+function renderSupportStore(store) {
+  const state = paymentState(store);
+  const planType = store.tipoPlano || "mensal";
+  const planLabel = { mensal: "Mensalista", anual: "Anual", unico: "Pagamento único" }[planType] || "Mensalista";
+  const revenue = planType === "unico" ? Number(store.valorPagamentoUnico || store.valorMensal || 0) : Number(store.valorMensal || 0);
+  return `<div class="support-card ${state}">
+    <div>
+      <h3>${escapeHtml(store.nome)}</h3>
+      <p><span class="support-status-dot ${state}"></span>${paymentStateLabel(state)} · vence ${formatDate(store.planoVencimento)}</p>
+      <p>${planLabel} · ${(store.tipoCliente || "b2b").toUpperCase()} · ${escapeHtml(store.formaPagamento || "Pagamento não informado")} · ${currency(revenue)}</p>
+    </div>
+    <div class="support-actions">
+      ${
+        store.asaasInvoiceUrl
+          ? `<a class="btn btn-ghost" href="${escapeHtml(store.asaasInvoiceUrl)}" target="_blank" rel="noopener">
+              <i class="fa-solid fa-file-invoice-dollar"></i>
+              Cobrança
+            </a>`
+          : ""
+      }
+      <button class="btn btn-primary" data-support-action="enter-store" data-id="${store.id}">
+        <i class="fa-solid fa-right-to-bracket"></i>
+        Entrar na loja
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderSaasTenants() {
+  if (!refs.saasTenantsList) return;
+  refs.saasTenantsList.innerHTML =
+    tenants
+      .map((tenant) => {
+        const tenantStores = stores.filter((store) => store.assistenciaId === tenant.id);
+        const mrr = tenantStores
+          .filter((store) => (store.tipoPlano || "mensal") !== "unico" && store.statusCliente !== "cancelado")
+          .reduce((sum, store) => sum + Number(store.valorMensal || 0), 0);
+        return `<article class="support-tenant">
+          <div class="support-tenant-head">
+            <div>
+              <h3>${escapeHtml(tenant.nome)}</h3>
+              <p>${tenantStores.length} lojas · MRR ${currency(mrr)}</p>
+            </div>
+            <div class="support-actions">
+              <button class="btn btn-primary" data-saas-action="enter-tenant" data-id="${tenant.id}">
+                <i class="fa-solid fa-building-user"></i>
+                Entrar na assistência
+              </button>
+              <button class="btn btn-ghost" data-saas-action="new-store" data-id="${tenant.id}">
+                <i class="fa-solid fa-plus"></i>
+                Adicionar loja
+              </button>
+            </div>
+          </div>
+        </article>`;
+      })
+      .join("") || emptyMini("Nenhuma assistência cadastrada.");
+}
+
+function renderNotices() {
+  if (!refs.noticeList) return;
+  refs.noticeList.innerHTML =
+    notices
+      .map((notice) => {
+        const tenant = tenants.find((item) => item.id === notice.assistenciaId);
+        return `<article class="notice-card ${notice.priority || "info"}">
+          <div>
+            <span>${escapeHtml(notice.priority || "info")}</span>
+            <h3>${escapeHtml(notice.title)}</h3>
+            <p>${escapeHtml(notice.message)}</p>
+            <small>${notice.audience === "all" ? "Todas as assistências" : escapeHtml(tenant?.nome || "Assistência específica")}</small>
+          </div>
+        </article>`;
+      })
+      .join("") || emptyMini("Nenhum aviso ativo.");
+}
+
+function renderTickets() {
+  if (!refs.ticketList) return;
+  refs.ticketList.innerHTML =
+    tickets
+      .map((ticket) => {
+        const status = ticket.status || "aberto";
+        return `<article class="ticket-card ${status}">
+          <div>
+            <div class="ticket-headline">
+              <h3>${escapeHtml(ticket.subject)}</h3>
+              <span class="status-badge status-slate">${escapeHtml(status)}</span>
+            </div>
+            <p>${escapeHtml(ticket.message)}</p>
+            <small>${escapeHtml(ticket.assistenciaNome || "Assistência")} · ${escapeHtml(ticket.category || "suporte")} · ${escapeHtml(ticket.priority || "normal")}</small>
+            ${ticket.response ? `<div class="ticket-response"><strong>Resposta Anup:</strong> ${escapeHtml(ticket.response)}</div>` : ""}
+          </div>
+          ${
+            isSupport()
+              ? `<div class="ticket-actions">
+                  <button class="btn btn-ghost" data-ticket-action="respond" data-id="${ticket.id}"><i class="fa-solid fa-reply"></i>Responder</button>
+                  <button class="btn btn-primary" data-ticket-action="close" data-id="${ticket.id}"><i class="fa-solid fa-check"></i>Fechar</button>
+                </div>`
+              : ""
+          }
+        </article>`;
+      })
+      .join("") || emptyMini("Nenhum chamado encontrado.");
 }
 
 function emptyMini(text) {
@@ -902,6 +1301,14 @@ function printOrder(order) {
 async function saveStore(event) {
   event.preventDefault();
   if (!canManage() || !activeStoreId) return;
+  const payload = storePayloadFromForm();
+  await updateDoc(doc(db, "lojas", activeStoreId), payload);
+  stores = stores.map((store) => (store.id === activeStoreId ? { ...store, ...payload } : store));
+  renderStoreSelector();
+  toast("Dados da loja atualizados.");
+}
+
+function storePayloadFromForm() {
   const payload = {
     nome: $("#storeNameInput").value.trim(),
     logoUrl: $("#storeLogoInput").value.trim(),
@@ -919,14 +1326,19 @@ async function saveStore(event) {
   };
   if (isSupport()) {
     payload.valorMensal = parseCurrency($("#storeMonthlyPriceInput").value);
-    payload.formaPagamento = $("#storePaymentMethodInput").value.trim();
+    payload.tipoPlano = $("#storePlanTypeInput").value;
+    payload.tipoCliente = $("#storeClientTypeInput").value;
+    payload.valorPagamentoUnico = parseCurrency($("#storeOneShotValueInput").value);
+    payload.custoSaasMensal = parseCurrency($("#storeSaasCostInput").value);
+    payload.investimentoAquisicao = parseCurrency($("#storeSaasInvestmentInput").value);
+    payload.statusCliente = $("#storeCustomerStatusInput").value;
+    payload.asaasBillingType = $("#storeAsaasBillingTypeInput").value;
+    payload.trialDias = Number($("#storeTrialDaysInput").value) || 0;
+    payload.formaPagamento = $("#storePaymentMethodInput").value.trim() || billingTypeLabel(payload.asaasBillingType);
     payload.planoVencimento = $("#storeDueDateInput").value;
     payload.planoStatus = $("#storePlanStatusInput").value;
   }
-  await updateDoc(doc(db, "lojas", activeStoreId), payload);
-  stores = stores.map((store) => (store.id === activeStoreId ? { ...store, ...payload } : store));
-  renderStoreSelector();
-  toast("Dados da loja atualizados.");
+  return payload;
 }
 
 function openUserModal(user = null) {
@@ -952,7 +1364,7 @@ async function saveUser(event) {
     nome: $("#userName").value.trim(),
     email: $("#userEmail").value.trim().toLowerCase(),
     role: $("#userRole").value,
-    assistenciaId: isSupport() ? activeStore()?.assistenciaId || null : profile.assistenciaId,
+    assistenciaId: isSupport() ? activeSupportAssistanceId || activeStore()?.assistenciaId || null : profile.assistenciaId,
     lojaIds: selectedStores,
     ativo: true,
     atualizadoEm: serverTimestamp(),
@@ -977,11 +1389,51 @@ async function resetUserPassword() {
   toast("E-mail de redefinição de senha enviado.");
 }
 
+async function generateAsaasBillingForStore(storeId, options = {}) {
+  if (!isSupport() || !storeId) return;
+  const button = $("#generateAsaasBillingBtn");
+  if (button) button.disabled = true;
+  try {
+    const result = await createAsaasBilling({
+      storeId,
+      force: Boolean(options.force),
+    });
+    const data = result.data || {};
+    stores = stores.map((store) =>
+      store.id === storeId
+        ? {
+            ...store,
+            asaasStatus: data.status,
+            asaasCustomerId: data.customerId,
+            asaasSubscriptionId: data.subscriptionId || store.asaasSubscriptionId || "",
+            asaasPaymentId: data.paymentId || store.asaasPaymentId || "",
+            asaasInvoiceUrl: data.invoiceUrl || store.asaasInvoiceUrl || "",
+            trialAte: data.trialEndsAt || store.trialAte || "",
+          }
+        : store
+    );
+    renderStoreSelector();
+    toast(data.message || "Cobrança Asaas gerada.");
+    return data;
+  } catch (error) {
+    toast(error?.message || "Não foi possível gerar a cobrança Asaas.", "error");
+    return null;
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function saveTenant(event) {
   event.preventDefault();
   if (!isSupport()) return;
   let assistenciaId = $("#tenantExisting").value;
   let assistenciaNome = $("#tenantName").value.trim();
+  const planType = $("#tenantPlanType").value;
+  const monthlyValue = parseCurrency($("#tenantMonthlyPrice").value);
+  const oneShotValue = parseCurrency($("#tenantOneShotValue").value);
+  const billingValue = planValue(planType, monthlyValue, oneShotValue);
+  const trialDays = Number($("#tenantTrialDays").value) || 0;
+  if (billingValue <= 0) return toast("Informe o valor do plano para gerar a cobrança.", "error");
   if (assistenciaId) {
     assistenciaNome = tenants.find((tenant) => tenant.id === assistenciaId)?.nome || assistenciaNome;
   } else {
@@ -993,31 +1445,121 @@ async function saveTenant(event) {
     });
     assistenciaId = assistencia.id;
   }
-  await addDoc(collection(db, "lojas"), {
+  const firstDueDate = trialDays > 0 ? addDaysISO(trialDays) : $("#tenantDueDate").value;
+  const storeRef = await addDoc(collection(db, "lojas"), {
     nome: $("#tenantStoreName").value.trim(),
     assistenciaId,
     assistenciaNome,
     logoUrl: "",
     endereco: "",
-    cnpj: "",
+    cnpj: $("#tenantBillingDocument").value.replace(/\D/g, ""),
     instagram: "",
-    email: "",
+    email: $("#tenantBillingEmail").value.trim().toLowerCase(),
     site: "",
     cep: "",
     cidade: "",
     estado: "",
-    whatsapp: "",
-    valorMensal: parseCurrency($("#tenantMonthlyPrice").value),
-    formaPagamento: $("#tenantPaymentMethod").value.trim(),
-    planoVencimento: $("#tenantDueDate").value,
+    whatsapp: normalizePhone($("#tenantBillingPhone").value),
+    valorMensal: monthlyValue,
+    tipoPlano: planType,
+    tipoCliente: $("#tenantClientType").value,
+    valorPagamentoUnico: oneShotValue,
+    valorPlanoAtual: billingValue,
+    custoSaasMensal: 0,
+    investimentoAquisicao: 0,
+    statusCliente: trialDays > 0 ? "teste" : "ativo",
+    formaPagamento: billingTypeLabel($("#tenantBillingType").value),
+    asaasBillingType: $("#tenantBillingType").value,
+    asaasStatus: "pendente",
+    asaasCustomerId: "",
+    asaasSubscriptionId: "",
+    asaasPaymentId: "",
+    asaasInvoiceUrl: "",
+    trialDias: trialDays,
+    trialAte: trialDays > 0 ? firstDueDate : "",
+    planoVencimento: firstDueDate,
     planoStatus: "em_dia",
     garantiaDias: 90,
     criadoEm: serverTimestamp(),
     atualizadoEm: serverTimestamp(),
   });
+  const billing = await generateAsaasBillingForStore(storeRef.id);
   refs.tenantForm.reset();
   refs.tenantModal.close();
-  toast("Assistência cadastrada.");
+  $("#tenantTrialDays").value = "30";
+  toast(
+    billing
+      ? "Assistência cadastrada e cobrança enviada para a Asaas."
+      : "Assistência cadastrada. Revise os dados e gere a cobrança Asaas pela Administração."
+  );
+}
+
+async function saveNotice(event) {
+  event.preventDefault();
+  if (!isSupport()) return;
+  const audience = $("#noticeAudience").value;
+  const assistenciaId = audience === "tenant" ? $("#noticeTenant").value : "";
+  if (audience === "tenant" && !assistenciaId) {
+    toast("Selecione a assistência que receberá o aviso.", "error");
+    return;
+  }
+  await addDoc(collection(db, "avisos"), {
+    title: $("#noticeTitle").value.trim(),
+    message: $("#noticeMessage").value.trim(),
+    priority: $("#noticePriority").value,
+    audience,
+    assistenciaId,
+    ativo: true,
+    criadoPor: currentUser.email,
+    criadoEm: serverTimestamp(),
+    atualizadoEm: serverTimestamp(),
+  });
+  refs.noticeForm.reset();
+  toast("Aviso publicado.");
+}
+
+async function saveTicket(event) {
+  event.preventDefault();
+  if (isSupport()) return;
+  const store = activeStore();
+  await addDoc(collection(db, "chamados"), {
+    subject: $("#ticketSubject").value.trim(),
+    message: $("#ticketMessage").value.trim(),
+    category: $("#ticketCategory").value,
+    priority: $("#ticketPriority").value,
+    status: "aberto",
+    assistenciaId: profile.assistenciaId,
+    assistenciaNome: store?.assistenciaNome || "",
+    lojaId: activeStoreId || "",
+    lojaNome: store?.nome || "",
+    abertoPor: currentUser.email,
+    criadoEm: serverTimestamp(),
+    atualizadoEm: serverTimestamp(),
+  });
+  refs.ticketForm.reset();
+  toast("Chamado aberto para o suporte Anup.");
+}
+
+async function handleTicketAction(action, id) {
+  if (!isSupport()) return;
+  if (action === "respond") {
+    const response = prompt("Resposta para a assistência:");
+    if (!response) return;
+    await updateDoc(doc(db, "chamados", id), {
+      response,
+      status: "respondido",
+      respondidoPor: currentUser.email,
+      atualizadoEm: serverTimestamp(),
+    });
+    toast("Chamado respondido.");
+  }
+  if (action === "close") {
+    await updateDoc(doc(db, "chamados", id), {
+      status: "fechado",
+      atualizadoEm: serverTimestamp(),
+    });
+    toast("Chamado fechado.");
+  }
 }
 
 function bindEvents() {
@@ -1027,15 +1569,16 @@ function bindEvents() {
   $("#newOrderBtnSecondary").addEventListener("click", () => openOrderModal());
   $("#newClientBtn").addEventListener("click", () => refs.clientModal.showModal());
   $("#newUserBtn").addEventListener("click", () => openUserModal());
-  $("#newTenantBtn").addEventListener("click", () => {
-    fillTenantOptions();
-    refs.tenantModal.showModal();
-  });
+  $("#newTenantBtn").addEventListener("click", () => openTenantModal());
+  $("#newTenantBtnSecondary").addEventListener("click", () => openTenantModal());
   $("#tenantExisting").addEventListener("change", () => {
     const hasExisting = Boolean($("#tenantExisting").value);
     $("#tenantName").disabled = hasExisting;
     $("#tenantName").required = !hasExisting;
     if (hasExisting) $("#tenantName").value = "";
+  });
+  $("#tenantTrialDays").addEventListener("input", () => {
+    $("#tenantDueDate").value = addDaysISO(Number($("#tenantTrialDays").value) || 0);
   });
   $("#resetPasswordBtn").addEventListener("click", resetUserPassword);
   $("#refreshBtn").addEventListener("click", () => {
@@ -1043,8 +1586,22 @@ function bindEvents() {
     renderOrders();
     toast("Painel atualizado.");
   });
+  $("#generateAsaasBillingBtn").addEventListener("click", async () => {
+    if (!activeStoreId) return toast("Entre em uma loja antes de gerar a cobrança.", "error");
+    const payload = storePayloadFromForm();
+    await updateDoc(doc(db, "lojas", activeStoreId), payload);
+    stores = stores.map((store) => (store.id === activeStoreId ? { ...store, ...payload } : store));
+    await generateAsaasBillingForStore(activeStoreId);
+  });
+  $("#ownerCentralBtn").addEventListener("click", returnToSaasCentral);
   refs.storeSelector.addEventListener("change", () => {
     activeStoreId = refs.storeSelector.value;
+    if (isSupport() && !activeStoreId) {
+      returnToSaasCentral();
+      return;
+    }
+    if (isSupport()) activeSupportAssistanceId = activeStore()?.assistenciaId || activeSupportAssistanceId;
+    renderShell();
     renderBrand();
     fillStoreFields();
     subscribeStoreData();
@@ -1053,6 +1610,8 @@ function bindEvents() {
   refs.clientForm.addEventListener("submit", saveClient);
   refs.userForm.addEventListener("submit", saveUser);
   refs.tenantForm.addEventListener("submit", saveTenant);
+  refs.noticeForm.addEventListener("submit", saveNotice);
+  refs.ticketForm.addEventListener("submit", saveTicket);
   refs.storeForm.addEventListener("submit", saveStore);
   [refs.searchInput, refs.statusFilter, refs.dateFilter].forEach((input) => input.addEventListener("input", renderOrders));
   [
@@ -1061,6 +1620,7 @@ function bindEvents() {
     refs.dashboardDateFilter,
     refs.dashboardPeriodFilter,
   ].forEach((input) => input.addEventListener("input", renderDashboard));
+  [refs.supportSearchInput, refs.supportPaymentFilter].forEach((input) => input.addEventListener("input", renderSupport));
   $$("[data-close-modal]").forEach((button) => button.addEventListener("click", () => closeModal(button.dataset.closeModal)));
   refs.ordersTable.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
@@ -1071,14 +1631,27 @@ function bindEvents() {
     if (button) openUserModal(users.find((user) => user.id === button.dataset.id));
   });
   refs.supportList.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-support-action='enter-store']");
+    const storeButton = event.target.closest("[data-support-action='enter-store']");
+    if (storeButton) {
+      enterSupportStore(storeButton.dataset.id);
+      return;
+    }
+    const tenantButton = event.target.closest("[data-saas-action='enter-tenant']");
+    if (tenantButton) enterSupportAssistance(tenantButton.dataset.id);
+  });
+  refs.saasTenantsList.addEventListener("click", (event) => {
+    const enterButton = event.target.closest("[data-saas-action='enter-tenant']");
+    if (enterButton) {
+      enterSupportAssistance(enterButton.dataset.id);
+      return;
+    }
+    const button = event.target.closest("[data-saas-action='new-store']");
     if (!button) return;
-    activeStoreId = button.dataset.id;
-    refs.storeSelector.value = activeStoreId;
-    renderBrand();
-    fillStoreFields();
-    subscribeStoreData();
-    showSection("dashboard");
+    openTenantModal(button.dataset.id);
+  });
+  refs.ticketList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-ticket-action]");
+    if (button) handleTicketAction(button.dataset.ticketAction, button.dataset.id);
   });
 }
 
@@ -1096,7 +1669,8 @@ onAuthStateChanged(auth, async (user) => {
     await loadStores();
     renderShell();
     subscribeStoreData();
-    showSection(location.hash?.replace("#", "") || "dashboard");
+    const initialSection = isSupport() ? "suporte" : location.hash?.replace("#", "") || "dashboard";
+    showSection(initialSection);
   } catch (error) {
   console.error("ERRO REAL:", error);
 

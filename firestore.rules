@@ -18,8 +18,27 @@ service cloud.firestore {
       return signedIn() && (supportEmail() || userDoc().role == "suporte");
     }
 
+    function isAssistanceAdmin() {
+      return signedIn() && userDoc().role == "assistencia_admin";
+    }
+
+    function isStoreAdmin() {
+      return signedIn() && userDoc().role == "loja_admin";
+    }
+
+    function storeDoc(lojaId) {
+      return get(/databases/$(database)/documents/lojas/$(lojaId)).data;
+    }
+
     function hasStore(lojaId) {
-      return signedIn() && (isSupport() || lojaId in userDoc().lojaIds);
+      return signedIn() && (
+        isSupport() ||
+        lojaId in userDoc().lojaIds ||
+        (
+          isAssistanceAdmin() &&
+          userDoc().assistenciaId == storeDoc(lojaId).assistenciaId
+        )
+      );
     }
 
     function managesTenant(assistenciaId) {
@@ -27,7 +46,7 @@ service cloud.firestore {
         isSupport() ||
         (
           userDoc().assistenciaId == assistenciaId &&
-          userDoc().role in ["assistencia_admin", "loja_admin"]
+          userDoc().role == "assistencia_admin"
         )
       );
     }
@@ -71,14 +90,48 @@ service cloud.firestore {
       allow create, update, delete: if isSupport();
     }
 
+    match /avisos/{avisoId} {
+      allow read: if signedIn() && (
+        isSupport() ||
+        resource.data.audience == "all" ||
+        resource.data.assistenciaId == userDoc().assistenciaId
+      );
+      allow create, update, delete: if isSupport();
+    }
+
+    match /chamados/{chamadoId} {
+      allow read: if signedIn() && (
+        isSupport() ||
+        resource.data.assistenciaId == userDoc().assistenciaId
+      );
+      allow create: if signedIn() && !isSupport() && request.resource.data.assistenciaId == userDoc().assistenciaId;
+      allow update, delete: if isSupport();
+    }
+
+    match /asaas_logs/{logId} {
+      allow read: if isSupport();
+      allow create, update, delete: if false;
+    }
+
     match /lojas/{lojaId} {
-      allow read: if hasStore(lojaId);
+      allow read: if signedIn() && (
+        isSupport() ||
+        lojaId in userDoc().lojaIds ||
+        (
+          isAssistanceAdmin() &&
+          userDoc().assistenciaId == resource.data.assistenciaId
+        )
+      );
       allow create, delete: if isSupport();
       allow update: if signedIn() && (
         isSupport() ||
         (
-          hasStore(lojaId) &&
-          userDoc().role in ["assistencia_admin", "loja_admin"]
+          isAssistanceAdmin() &&
+          userDoc().assistenciaId == resource.data.assistenciaId
+        ) ||
+        (
+          isStoreAdmin() &&
+          lojaId in userDoc().lojaIds
         )
       );
 

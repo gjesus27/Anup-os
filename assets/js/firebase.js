@@ -24,6 +24,10 @@ import {
   updateDoc,
   where,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getFunctions,
+  httpsCallable,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyB1mJL2R5DiRXNrKaLCtvMxu6Oo-5zqM1o",
@@ -39,6 +43,7 @@ export const secondaryApp = initializeApp(firebaseConfig, "secondary");
 export const auth = getAuth(app);
 export const secondaryAuth = getAuth(secondaryApp);
 export const db = getFirestore(app);
+export const functions = getFunctions(app, "southamerica-east1");
 
 export {
   addDoc,
@@ -48,6 +53,7 @@ export {
   doc,
   getDoc,
   getDocs,
+  httpsCallable,
   limit,
   onSnapshot,
   onAuthStateChanged,
